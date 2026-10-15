@@ -13,6 +13,7 @@
         "/^docker restart ppro-frontend && echo \"Reiniciado ok\"$/": {
             "approve": true,
             "matchCommandLine": true
-        }
+        },
+        "npx tsc": true
     }
 }

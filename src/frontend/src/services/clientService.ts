@@ -3,8 +3,10 @@ import {
   Client,
   CreateClientRequest,
   UpdateClientRequest,
-  ClientListResponse,
   ClientCompany,
+  OnboardClientRequest,
+  ClientOnboardingResponse,
+  CoreClientPage,
 } from '@/types';
 
 // Tipo para resposta wrapper da API
@@ -16,6 +18,20 @@ interface ApiResponse<T> {
 }
 
 export const clientService = {
+  async onboardClient(
+    data: OnboardClientRequest
+  ): Promise<ClientOnboardingResponse> {
+    const response = await api.post<ApiResponse<ClientOnboardingResponse>>(
+      '/clients/onboard',
+      data
+    );
+    return response.data.data;
+  },
+
+  async resendAdministratorActivation(userId: string): Promise<void> {
+    await api.post(`/users/${userId}/resend-activation`);
+  },
+
   /**
    * Listar todos os clientes com paginação e busca
    */
@@ -23,8 +39,8 @@ export const clientService = {
     page?: number;
     pageSize?: number;
     search?: string;
-  }): Promise<ClientListResponse> {
-    const response = await api.get<ApiResponse<ClientListResponse>>('/clients', { params });
+  }): Promise<CoreClientPage> {
+    const response = await api.get<ApiResponse<CoreClientPage>>('/clients', { params });
     return response.data.data;
   },
 
@@ -63,7 +79,7 @@ export const clientService = {
    * Ativar um cliente
    */
   async activateClient(id: string): Promise<Client> {
-    const response = await api.patch<ApiResponse<Client>>(`/clients/${id}/activate`);
+    const response = await api.post<ApiResponse<Client>>(`/clients/${id}/activate`);
     return response.data.data;
   },
 
@@ -71,7 +87,7 @@ export const clientService = {
    * Desativar um cliente
    */
   async deactivateClient(id: string): Promise<Client> {
-    const response = await api.patch<ApiResponse<Client>>(`/clients/${id}/deactivate`);
+    const response = await api.post<ApiResponse<Client>>(`/clients/${id}/deactivate`);
     return response.data.data;
   },
 
@@ -79,7 +95,7 @@ export const clientService = {
    * Suspender um cliente
    */
   async suspendClient(id: string): Promise<Client> {
-    const response = await api.patch<ApiResponse<Client>>(`/clients/${id}/suspend`);
+    const response = await api.post<ApiResponse<Client>>(`/clients/${id}/suspend`);
     return response.data.data;
   },
 

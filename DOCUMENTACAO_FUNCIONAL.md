@@ -1179,55 +1179,34 @@ GET /api/audit?action=Delete
 
 ```mermaid
 graph TD
-    A[SuperAdmin cria empresa] --> B[Sistema gera estrutura]
-    B --> C[SuperAdmin cria usuário admin]
-    C --> D[Admin recebe e-mail com credenciais]
-    D --> E[Admin faz primeiro login]
-    E --> F[Admin altera senha]
-    F --> G[Admin configura empresa]
-    G --> H[Admin convida usuários]
-    H --> I[Usuários fazem onboarding]
+    A[SuperAdmin abre Clientes do Sistema] --> B[Cadastra tenant, empresa e administrador]
+    B --> C[Sistema persiste os registros em uma transação]
+    C --> D[Administrador recebe convite de ativação]
+    D --> E[Administrador define senha e ativa a conta]
+    E --> F[Administrador acessa o tenant e convida usuários]
 ```
 
 **Passos Detalhados:**
 
-1. **SuperAdmin cria empresa**
-   - Acessa `/companies/new`
-   - Preenche dados cadastrais
-   - Define configurações iniciais
-   - Salva empresa
+1. **SuperAdmin inicia o onboarding**
+   - Acessa `/admin/clients`
+   - Informa os dados do tenant, da primeira empresa e do administrador inicial
+   - O administrador inicial recebe o papel `Admin`
 
-2. **Sistema gera estrutura**
-   - Cria registro em `companies`
-   - Inicializa configurações padrão
-   - Prepara ambiente multi-tenant
+2. **Sistema cria a estrutura inicial**
+   - Persiste cliente, empresa, usuário e papel em uma única transação
+   - Se uma gravação falhar, a transação é desfeita
+   - O usuário fica pendente de ativação e recebe um link válido por 72 horas
 
-3. **SuperAdmin cria usuário admin**
-   - Acessa `/users/new`
-   - Define e-mail e dados
-   - Atribui role `Admin`
-   - Sistema gera senha temporária
+3. **Administrador ativa a conta**
+   - Abre o link recebido por e-mail
+   - Define a senha e ativa o acesso
+   - Passa a operar somente no tenant e empresa associados
 
-4. **Admin recebe e-mail**
-   - E-mail com link de ativação
-   - Credenciais temporárias
-   - Instruções de primeiro acesso
-
-5. **Admin faz primeiro login**
-   - Acessa sistema com credenciais
-   - Sistema força alteração de senha
-   - Define preferências iniciais
-
-6. **Admin configura empresa**
-   - Logo e branding
-   - Preferências fiscais
-   - Configurações de vesting
-   - Notificações
-
-7. **Admin convida usuários**
-   - Cria usuários operacionais
-   - Define funções e permissões
-   - Envia convites
+4. **SuperAdmin acompanha o tenant**
+   - Consulta status, quantidade de empresas e usuários
+   - Pode ativar, suspender ou desativar o tenant
+   - Se o envio do convite falhar, pode reenviá-lo pela tela de onboarding
 
 ---
 

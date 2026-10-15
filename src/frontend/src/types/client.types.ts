@@ -29,6 +29,48 @@ export interface CreateClientRequest {
   phone?: string;
 }
 
+export interface OnboardClientRequest {
+  client: CreateClientRequest & { tradingName?: string };
+  company: {
+    name: string;
+    tradingName?: string;
+    cnpj: string;
+    legalForm: number;
+    foundationDate: string;
+    totalShares: number;
+    sharePrice: number;
+    currency: string;
+  };
+  administratorName: string;
+  administratorEmail: string;
+}
+
+export interface ClientOnboardingResponse {
+  clientId: string;
+  companyId: string;
+  administratorId: string;
+  activationEmailSent: boolean;
+}
+
+export interface CoreClientSummary {
+  id: string;
+  name: string;
+  tradingName?: string;
+  documentFormatted: string;
+  email: string;
+  status: string;
+  totalCompanies: number;
+  totalUsers: number;
+}
+
+export interface CoreClientPage {
+  items: CoreClientSummary[];
+  totalCount: number;
+  pageNumber: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 export interface UpdateClientRequest {
   name?: string;
   email?: string;

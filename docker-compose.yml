@@ -25,8 +25,8 @@ services:
       - contract_storage:/app/storage
     ports:
       - "5000:5000"
-    networks:
-      - pm-network
+    # Custom bridge networks have no outbound access in some Codespaces
+    network_mode: bridge
 
   # ===========================================
   # FRONTEND - React + Vite

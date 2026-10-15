@@ -1,9 +1,21 @@
 using FluentValidation;
 using PartnershipManager.Application.Features.Clients.DTOs;
+using PartnershipManager.Application.Features.Companies.Validators;
 using PartnershipManager.Domain.Constants;
 using PartnershipManager.Domain.Enums;
 
 namespace PartnershipManager.Application.Features.Clients.Validators;
+
+public class OnboardClientValidator : AbstractValidator<OnboardClientRequest>
+{
+    public OnboardClientValidator()
+    {
+        RuleFor(x => x.Client).NotNull().SetValidator(new CreateClientValidator());
+        RuleFor(x => x.Company).NotNull().SetValidator(new CreateCompanyValidator());
+        RuleFor(x => x.AdministratorName).NotEmpty().MaximumLength(SystemConstants.MaxNameLength);
+        RuleFor(x => x.AdministratorEmail).NotEmpty().EmailAddress().MaximumLength(SystemConstants.MaxEmailLength);
+    }
+}
 
 /// <summary>
 /// Validador para CreateClientRequest

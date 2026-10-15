@@ -37,9 +37,10 @@ import CommunicationsPage from './pages/communications';
 import CommunicationDetailPage from './pages/communications/CommunicationDetailPage';
 import NotificationsPage from './pages/notifications';
 import DataRoomPage from './pages/dataroom';
+import CoreClientsPage from './pages/admin/CoreClientsPage';
 
 function App() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
 
   return (
     <Routes>
@@ -63,18 +64,18 @@ function App() {
         <Route path="/cap-table/transactions" element={<TransactionsPage />} />
         <Route path="/companies" element={<Companies />} />
         <Route path="/partners" element={<Navigate to="/shareholders" replace />} />
-        
+
         {/* Shareholders Routes */}
         <Route path="/shareholders" element={<ShareholdersListPage />} />
         <Route path="/shareholders/:id" element={<ShareholderDetailPage />} />
-        
+
         {/* Contracts Routes */}
         <Route path="/contracts" element={<ContractsListPage />} />
         <Route path="/contracts/:id" element={<ContractDetailsPage />} />
         <Route path="/contracts/templates" element={<ContractTemplatesPage />} />
         <Route path="/contracts/clauses" element={<ClausesPage />} />
         <Route path="/contracts/builder" element={<ContractBuilderPage />} />
-        
+
         {/* Vesting Routes */}
         <Route path="/vesting" element={<VestingPage />} />
         <Route path="/vesting/grants" element={<VestingGrantsPage />} />
@@ -83,7 +84,7 @@ function App() {
         <Route path="/vesting/milestone-templates" element={<MilestoneTemplatesPage />} />
         <Route path="/vesting/plans/:id" element={<VestingPlanDetailPage />} />
         <Route path="/my-vesting" element={<MyVestingPage />} />
-        
+
         {/* Valuation Routes */}
         <Route path="/valuations" element={<ValuationsPage />} />
         <Route path="/valuations/new" element={<ValuationNewPage />} />
@@ -122,6 +123,16 @@ function App() {
         {/* Settings Routes */}
         <Route path="/settings/users" element={<Users />} />
         <Route path="/settings/roles" element={<RolesPage />} />
+        <Route
+          path="/admin/clients"
+          element={
+            user?.roles.includes('SuperAdmin') ? (
+              <CoreClientsPage />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
         
         {/* Billing Routes */}
         <Route path="/billing" element={<BillingDashboard />} />

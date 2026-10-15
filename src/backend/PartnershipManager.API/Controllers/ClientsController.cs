@@ -1,11 +1,16 @@
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PartnershipManager.Application.Common.Models;
+using PartnershipManager.Application.Features.Companies.DTOs;
 using PartnershipManager.Application.Features.Clients.DTOs;
 using PartnershipManager.Domain.Constants;
 using PartnershipManager.Domain.Entities;
+using PartnershipManager.Domain.Enums;
 using PartnershipManager.Domain.Exceptions;
 using PartnershipManager.Domain.Interfaces;
+using PartnershipManager.Domain.Interfaces.Services;
 
 namespace PartnershipManager.API.Controllers;
 
@@ -19,17 +24,131 @@ namespace PartnershipManager.API.Controllers;
 public class ClientsController : ControllerBase
 {
     private readonly ICoreClientRepository _clientRepository;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ICacheService _cacheService;
+    private readonly IEmailService _emailService;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<ClientsController> _logger;
     
     public ClientsController(
         ICoreClientRepository clientRepository,
+        IUnitOfWork unitOfWork,
         ICacheService cacheService,
+        IEmailService emailService,
+        IConfiguration configuration,
         ILogger<ClientsController> logger)
     {
         _clientRepository = clientRepository;
+        _unitOfWork = unitOfWork;
         _cacheService = cacheService;
+        _emailService = emailService;
+        _configuration = configuration;
         _logger = logger;
+    }
+
+    [HttpPost("onboard")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(ApiResponse<ClientOnboardingResponse>), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Onboard([FromBody] OnboardClientRequest request)
+    {
+        if (await _clientRepository.DocumentExistsAsync(request.Client.Document))
+            throw new ConflictException("Documento já cadastrado");
+
+        if (await _clientRepository.EmailExistsAsync(request.Client.Email))
+            throw new ConflictException("Email do cliente já cadastrado");
+
+        if (await _unitOfWork.Companies.CnpjExistsAsync(request.Company.Cnpj))
+            throw new ConflictException(ErrorMessages.CnpjAlreadyExists);
+
+        if (await _unitOfWork.Users.GetByEmailAsync(request.AdministratorEmail) is not null)
+            throw new ConflictException(ErrorMessages.UserAlreadyExists);
+
+        var client = Client.Create(
+            request.Client.Name,
+            request.Client.Document,
+            request.Client.DocumentType,
+            request.Client.Email,
+            request.Client.TradingName,
+            request.Client.Phone);
+
+        var company = Company.Create(
+            client.Id,
+            request.Company.Name,
+            request.Company.Cnpj,
+            request.Company.LegalForm,
+            request.Company.FoundationDate,
+            request.Company.TotalShares,
+            request.Company.SharePrice,
+            request.Company.TradingName,
+            request.Company.Currency);
+
+        var administrator = PartnershipManager.Domain.Entities.User.Create(
+            client.Id,
+            request.AdministratorEmail,
+            request.AdministratorName,
+            string.Empty,
+            company.Id);
+
+        var tokenBytes = RandomNumberGenerator.GetBytes(32);
+        var activationToken = Convert.ToBase64String(tokenBytes)
+            .Replace("+", "-").Replace("/", "_").Replace("=", "");
+        var hashedToken = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(activationToken))).ToLowerInvariant();
+
+        await _unitOfWork.BeginTransactionAsync();
+        try
+        {
+            await _clientRepository.AddAsync(client);
+            await _unitOfWork.Companies.AddAsync(company);
+            await _unitOfWork.Users.AddAsync(administrator);
+            await _unitOfWork.UserRoles.AddAsync(UserRole.Create(administrator.Id, Role.Admin));
+            await _unitOfWork.Users.UpdatePasswordResetTokenAsync(
+                administrator.Id,
+                hashedToken,
+                DateTime.UtcNow.AddHours(72));
+            await _unitOfWork.CommitTransactionAsync();
+        }
+        catch
+        {
+            await _unitOfWork.RollbackTransactionAsync();
+            throw;
+        }
+
+        var activationEmailSent = false;
+        try
+        {
+            var frontendUrl = (Request.Headers.Origin.FirstOrDefault()
+                ?? _configuration["Email:FrontendUrl"])?.TrimEnd('/') ?? "http://localhost:5173";
+            var activationLink = $"{frontendUrl}/activate-account?token={Uri.EscapeDataString(activationToken)}";
+            await _emailService.SendAccountActivationEmailAsync(
+                administrator.Email,
+                administrator.Name,
+                activationLink,
+                administrator.Language.ToString().ToLowerInvariant());
+            activationEmailSent = true;
+        }
+        catch (Exception emailException)
+        {
+            _logger.LogError(emailException,
+                "Falha ao enviar convite de onboarding para {Email}", administrator.Email);
+        }
+
+        _logger.LogInformation(
+            "Onboarding concluído para o cliente {ClientId}, empresa {CompanyId} e administrador {AdministratorId}",
+            client.Id,
+            company.Id,
+            administrator.Id);
+
+        var response = new ClientOnboardingResponse
+        {
+            ClientId = client.Id,
+            CompanyId = company.Id,
+            AdministratorId = administrator.Id,
+            ActivationEmailSent = activationEmailSent
+        };
+
+        return CreatedAtAction(nameof(GetById), new { id = client.Id },
+            ApiResponse<ClientOnboardingResponse>.Ok(response, "Onboarding concluído"));
     }
     
     /// <summary>

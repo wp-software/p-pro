@@ -1,4 +1,5 @@
 using PartnershipManager.Domain.Enums;
+using PartnershipManager.Application.Features.Companies.DTOs;
 
 namespace PartnershipManager.Application.Features.Clients.DTOs;
 
@@ -35,6 +36,22 @@ public record CreateClientRequest
     public DocumentType DocumentType { get; init; }
     public string Email { get; init; } = string.Empty;
     public string? Phone { get; init; }
+}
+
+public record OnboardClientRequest
+{
+    public CreateClientRequest Client { get; init; } = new();
+    public CreateCompanyRequest Company { get; init; } = new();
+    public string AdministratorName { get; init; } = string.Empty;
+    public string AdministratorEmail { get; init; } = string.Empty;
+}
+
+public record ClientOnboardingResponse
+{
+    public Guid ClientId { get; init; }
+    public Guid CompanyId { get; init; }
+    public Guid AdministratorId { get; init; }
+    public bool ActivationEmailSent { get; init; }
 }
 
 /// <summary>

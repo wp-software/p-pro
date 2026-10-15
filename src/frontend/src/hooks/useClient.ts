@@ -4,11 +4,33 @@ import { clientService } from '@/services/clientService';
 import { useClientStore } from '@/stores/clientStore';
 import type {
   CreateClientRequest,
+  OnboardClientRequest,
   UpdateClientRequest,
 } from '@/types';
 import toast from 'react-hot-toast';
 
 const QUERY_KEY = ['clients'];
+
+export function useOnboardClient() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: OnboardClientRequest) => clientService.onboardClient(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+    },
+  });
+}
+
+export function useResendAdministratorActivation() {
+  return useMutation({
+    mutationFn: (userId: string) => clientService.resendAdministratorActivation(userId),
+    onSuccess: () => toast.success('Convite reenviado com sucesso'),
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Não foi possível reenviar o convite');
+    },
+  });
+}
 
 /**
  * Hook para listar clientes com paginação e busca
@@ -161,7 +183,7 @@ export function useSuspendClient() {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Erro ao suspender cliente');
-    },
+    }
   });
 }
 

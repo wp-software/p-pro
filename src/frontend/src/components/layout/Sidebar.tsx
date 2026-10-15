@@ -118,6 +118,12 @@ const navGroups: NavGroup[] = [
     items: [
       { nameKey: 'nav.users', href: '/settings/users', icon: Users },
       { nameKey: 'nav.roles', href: '/settings/roles', icon: UserCheck },
+      {
+        nameKey: 'nav.coreClients',
+        href: '/admin/clients',
+        icon: Building2,
+        requiresRole: ['SuperAdmin'],
+      },
     ],
   },
   {
