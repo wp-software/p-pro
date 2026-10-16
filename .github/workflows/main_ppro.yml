@@ -6,7 +6,7 @@ name: Build and deploy container app to Azure Web App - ppro
 on:
   push:
     branches:
-      - main
+      - 'main'
   workflow_dispatch:
 
 jobs:
@@ -25,15 +25,15 @@ jobs:
         uses: docker/login-action@v2
         with:
           registry: containerppro.azurecr.io/
-          username: ${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_764233E5363A41329D3D1614CB258A09 }}
-          password: ${{ secrets.AZUREAPPSERVICE_CONTAINERPASSWORD_9A84F7CC56914975ACC531E3ED371182 }}
+          username: ${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_C8144D4A5FE2412C93AF2938A429A425 }}
+          password: ${{ secrets.AZUREAPPSERVICE_CONTAINERPASSWORD_770F532D374F4004BBA9B7B0EB0A704A }}
 
       - name: Build and push container image to registry
         uses: docker/build-push-action@v3
         with:
           context: .
           push: true
-          tags: containerppro.azurecr.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_764233E5363A41329D3D1614CB258A09 }}/ppro:${{ github.sha }}
+          tags: containerppro.azurecr.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_C8144D4A5FE2412C93AF2938A429A425 }}/containerppro/ppro:${{ github.sha }}
           file: ./Dockerfile
 
   deploy:
@@ -49,9 +49,9 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_E3A5CBFE97A843FAB689302BC87B2785 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_9D420031EF614167B46DFEDF744C798B }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_182B484F54FD4D0AAD7FCD2110F8D45B }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_7953F0D2E5374CFFB6CC266B56B04749 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_7AE3753986FC4CD4976DDC5C41DD1667 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_3541B560D1404351909A2CC4DEB30D95 }}
 
       - name: Deploy to Azure Web App
         id: deploy-to-webapp
@@ -59,5 +59,5 @@ jobs:
         with:
           app-name: 'ppro'
           slot-name: 'Production'
-          images: 'containerppro.azurecr.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_764233E5363A41329D3D1614CB258A09 }}/ppro:${{ github.sha }}'
+          images: 'containerppro.azurecr.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_C8144D4A5FE2412C93AF2938A429A425 }}/containerppro/ppro:${{ github.sha }}'
           
