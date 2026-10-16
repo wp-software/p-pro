@@ -27,8 +27,13 @@ interface AuthState {
   setLoading: (loading: boolean) => void;
 }
 
+type PersistedAuthState = Pick<
+  AuthState,
+  'user' | 'accessToken' | 'refreshToken' | 'isAuthenticated'
+>;
+
 export const useAuthStore = create<AuthState>()(
-  persist(
+  persist<AuthState, [], [], PersistedAuthState>(
     (set) => ({
       user: null,
       accessToken: null,
