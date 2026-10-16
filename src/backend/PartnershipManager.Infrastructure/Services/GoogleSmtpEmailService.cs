@@ -26,6 +26,7 @@ public sealed class GoogleSmtpEmailService : IEmailService
     private readonly string? _password;
     private readonly string _fromEmail;
     private readonly string _fromName;
+    private readonly ResendEmailSender? _resend;
 
     public GoogleSmtpEmailService(
         IConfiguration configuration,
@@ -44,6 +45,13 @@ public sealed class GoogleSmtpEmailService : IEmailService
         _password   = DecodePasswordIfBase64(section["Password"]);
         _fromEmail  = section["FromEmail"]  ?? "noreply@example.com";
         _fromName   = section["FromName"]   ?? "P-Pro | WP Manager";
+
+        if (string.Equals(section["Provider"], "Resend", StringComparison.OrdinalIgnoreCase))
+        {
+            _resend = new ResendEmailSender(
+                section["Resend:ApiKey"] ?? string.Empty,
+                section["Resend:BaseUrl"] ?? "https://api.resend.com");
+        }
     }
 
     /// <inheritdoc/>
@@ -106,6 +114,12 @@ public sealed class GoogleSmtpEmailService : IEmailService
 
     private async Task SendAsync(MimeMessage message)
     {
+        if (_resend is not null)
+        {
+            await _resend.SendAsync(message);
+            return;
+        }
+
         using var client = new SmtpClient();
 
         var socketOptions = _enableSsl

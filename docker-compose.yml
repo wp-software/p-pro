@@ -21,6 +21,9 @@ services:
       - Jwt__Audience=${JWT_AUDIENCE:-PartnershipManagerApp}
       - Cors__Origins=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://frontend:3000}
       - Email__FrontendUrl=${FRONTEND_URL:-http://localhost:3000}
+      - Email__Provider=${EMAIL_PROVIDER:-Smtp}
+      - Email__Resend__ApiKey=${RESEND_API_KEY:-}
+      - Email__FromEmail=${EMAIL_FROM_ADDRESS:-suporte@wpmanager.com.br}
     volumes:
       - contract_storage:/app/storage
     ports:
