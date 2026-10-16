@@ -8,7 +8,7 @@ on:
 env:
   REGISTRY: containerppro.azurecr.io
   IMAGE_NAME: ppro
-  AZURE_WEBAPP_NAME: <nome-do-seu-webapp>  # TODO: substituir pelo nome do seu Azure Web App
+  AZURE_WEBAPP_NAME: ppro
 
 jobs:
   build-and-push:
