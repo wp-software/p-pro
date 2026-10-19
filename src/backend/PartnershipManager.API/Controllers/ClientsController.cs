@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using PartnershipManager.Application.Common.Models;
 using PartnershipManager.Application.Features.Companies.DTOs;
 using PartnershipManager.Application.Features.Clients.DTOs;
+using PartnershipManager.Application.Features.Users.DTOs;
 using PartnershipManager.Domain.Constants;
 using PartnershipManager.Domain.Entities;
 using PartnershipManager.Domain.Enums;
@@ -199,6 +200,7 @@ public class ClientsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(Guid id)
     {
+        EnsureClientAccess(id);
         var cacheKey = $"client:{id}";
         
         var client = await _cacheService.GetOrSetAsync(
@@ -224,6 +226,7 @@ public class ClientsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetClientCompanies(Guid id)
     {
+        EnsureClientAccess(id);
         if (!await _clientRepository.ExistsAsync(id))
         {
             throw new NotFoundException("Cliente", id);
@@ -243,6 +246,122 @@ public class ClientsController : ControllerBase
         return Ok(ApiResponse<IEnumerable<ClientCompanyResponse>>.Ok(response));
     }
     
+    /// <summary>
+    /// Lista os usuários de um cliente
+    /// </summary>
+    [HttpGet("{id:guid}/users")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<UserSummaryResponse>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetClientUsers(
+        Guid id,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? search = null)
+    {
+        if (!await _clientRepository.ExistsAsync(id))
+        {
+            throw new NotFoundException("Cliente", id);
+        }
+
+        page = Math.Max(page, 1);
+        pageSize = Math.Clamp(pageSize, 1, SystemConstants.MaxPageSize);
+
+        var (users, total) = await _unitOfWork.Users.GetPagedByClientAsync(id, page, pageSize, search);
+
+        var items = new List<UserSummaryResponse>();
+        foreach (var user in users)
+        {
+            var roles = await _unitOfWork.UserRoles.GetRoleNamesByUserIdAsync(user.Id);
+            items.Add(new UserSummaryResponse
+            {
+                Id = user.Id,
+                Email = user.Email,
+                Name = user.Name,
+                AvatarUrl = user.AvatarUrl,
+                Status = user.Status.ToString(),
+                Roles = roles.ToList()
+            });
+        }
+
+        return Ok(ApiResponse<PagedResult<UserSummaryResponse>>.Ok(
+            new PagedResult<UserSummaryResponse>(items, total, page, pageSize)));
+    }
+
+    /// <summary>
+    /// Convida um novo usuário para uma empresa do cliente
+    /// </summary>
+    [HttpPost("{id:guid}/users")]
+    [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(typeof(ApiResponse<UserSummaryResponse>), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CreateClientUser(Guid id, [FromBody] CreateClientUserRequest request)
+    {
+        if (!await _clientRepository.ExistsAsync(id))
+            throw new NotFoundException("Cliente", id);
+
+        if (request.Role == Role.SuperAdmin)
+            throw new ForbiddenException();
+
+        var company = await _unitOfWork.Companies.GetByIdAsync(request.CompanyId);
+        if (company == null || company.ClientId != id)
+            throw new NotFoundException("Empresa", request.CompanyId);
+
+        if (await _unitOfWork.Users.GetByEmailAsync(request.Email) is not null)
+            throw new ConflictException(ErrorMessages.UserAlreadyExists);
+
+        var user = PartnershipManager.Domain.Entities.User.Create(
+            id, request.Email, request.Name, string.Empty, company.Id);
+
+        var tokenBytes = RandomNumberGenerator.GetBytes(32);
+        var activationToken = Convert.ToBase64String(tokenBytes)
+            .Replace("+", "-").Replace("/", "_").Replace("=", "");
+        var hashedToken = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(activationToken))).ToLowerInvariant();
+
+        await _unitOfWork.BeginTransactionAsync();
+        try
+        {
+            await _unitOfWork.Users.AddAsync(user);
+            await _unitOfWork.UserRoles.AddAsync(UserRole.Create(user.Id, request.Role));
+            await _unitOfWork.Users.UpdatePasswordResetTokenAsync(user.Id, hashedToken, DateTime.UtcNow.AddHours(72));
+            await _unitOfWork.CommitTransactionAsync();
+        }
+        catch
+        {
+            await _unitOfWork.RollbackTransactionAsync();
+            throw;
+        }
+
+        var activationEmailSent = false;
+        try
+        {
+            var frontendUrl = (Request.Headers.Origin.FirstOrDefault()
+                ?? _configuration["Email:FrontendUrl"])?.TrimEnd('/') ?? "http://localhost:5173";
+            var activationLink = $"{frontendUrl}/activate-account?token={Uri.EscapeDataString(activationToken)}";
+            await _emailService.SendAccountActivationEmailAsync(
+                user.Email, user.Name, activationLink, user.Language.ToString().ToLowerInvariant());
+            activationEmailSent = true;
+        }
+        catch (Exception emailException)
+        {
+            _logger.LogError(emailException, "Falha ao enviar convite para {Email}", user.Email);
+        }
+
+        _logger.LogInformation("Usuário {UserId} convidado ao cliente {ClientId}", user.Id, id);
+
+        var response = new UserSummaryResponse
+        {
+            Id = user.Id,
+            Email = user.Email,
+            Name = user.Name,
+            Status = user.Status.ToString(),
+            Roles = new[] { request.Role.ToString() }
+        };
+        return StatusCode(StatusCodes.Status201Created, ApiResponse<UserSummaryResponse>.Ok(
+            response, activationEmailSent ? "Convite enviado" : "Usuário criado, mas o convite falhou"));
+    }
+
     /// <summary>
     /// Cria um novo cliente
     /// </summary>
@@ -291,6 +410,7 @@ public class ClientsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateClientRequest request)
     {
+        EnsureClientAccess(id);
         var client = await _clientRepository.GetByIdAsync(id);
         if (client == null)
         {
@@ -354,6 +474,7 @@ public class ClientsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateSettings(Guid id, [FromBody] UpdateClientSettingsRequest request)
     {
+        EnsureClientAccess(id);
         var client = await _clientRepository.GetByIdAsync(id);
         if (client == null)
         {
@@ -478,6 +599,18 @@ public class ClientsController : ControllerBase
         return Ok(ApiResponse<object>.Ok(new { }, "Cliente excluído com sucesso"));
     }
     
+    // Admin só acessa o próprio cliente; SuperAdmin acessa qualquer um
+    private void EnsureClientAccess(Guid clientId)
+    {
+        if (User.IsInRole("SuperAdmin")) return;
+
+        var claim = User.FindFirst("clientId") ?? User.FindFirst("ClientId") ?? User.FindFirst("client_id");
+        if (!Guid.TryParse(claim?.Value, out var ownClientId) || ownClientId != clientId)
+        {
+            throw new ForbiddenException();
+        }
+    }
+
     // Helper Methods
     private async Task<ClientResponse> MapToResponseAsync(Client client)
     {

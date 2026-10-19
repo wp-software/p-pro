@@ -38,6 +38,7 @@ import CommunicationDetailPage from './pages/communications/CommunicationDetailP
 import NotificationsPage from './pages/notifications';
 import DataRoomPage from './pages/dataroom';
 import CoreClientsPage from './pages/admin/CoreClientsPage';
+import ClientDetailPage from './pages/admin/ClientDetailPage';
 
 function App() {
   const { isAuthenticated, user } = useAuthStore();
@@ -133,7 +134,17 @@ function App() {
             )
           }
         />
-        
+        <Route
+          path="/admin/clients/:id"
+          element={
+            user?.roles.includes('SuperAdmin') ? (
+              <ClientDetailPage />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+
         {/* Billing Routes */}
         <Route path="/billing" element={<BillingDashboard />} />
         <Route path="/billing/plans" element={<Plans />} />

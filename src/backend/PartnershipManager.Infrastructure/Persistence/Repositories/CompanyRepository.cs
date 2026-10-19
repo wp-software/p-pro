@@ -142,11 +142,15 @@ public class CompanyRepository : BaseRepository<Company>, ICompanyRepository
         return await Connection.QueryAsync<Company>(sql, transaction: Transaction);
     }
 
-    public async Task<(IEnumerable<Company> Items, int Total)> GetPagedAsync(int page, int pageSize, string? search = null)
+    public async Task<(IEnumerable<Company> Items, int Total)> GetPagedAsync(int page, int pageSize, string? search = null, Guid? clientId = null)
     {
         var offset = (page - 1) * pageSize;
         
         var whereClause = "WHERE is_deleted = 0";
+        if (clientId.HasValue)
+        {
+            whereClause += " AND client_id = @ClientId";
+        }
         if (!string.IsNullOrWhiteSpace(search))
         {
             whereClause += " AND (name LIKE @Search OR trading_name LIKE @Search OR cnpj LIKE @Search)";
@@ -172,7 +176,7 @@ public class CompanyRepository : BaseRepository<Company>, ICompanyRepository
                         ORDER BY name
                         LIMIT @PageSize OFFSET @Offset";
 
-        var parameters = new { Search = $"%{search}%", PageSize = pageSize, Offset = offset };
+        var parameters = new { Search = $"%{search}%", ClientId = clientId, PageSize = pageSize, Offset = offset };
 
         var total = await Connection.ExecuteScalarAsync<int>(countSql, parameters, Transaction);
         var items = await Connection.QueryAsync<Company>(dataSql, parameters, Transaction);

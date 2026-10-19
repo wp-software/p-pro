@@ -45,7 +45,7 @@ public class CompaniesController : ControllerBase
     {
         pageSize = Math.Min(pageSize, SystemConstants.MaxPageSize);
         
-        var (companies, total) = await _unitOfWork.Companies.GetPagedAsync(page, pageSize, search);
+        var (companies, total) = await _unitOfWork.Companies.GetPagedAsync(page, pageSize, search, GetTenantFilter());
         
         var items = companies.Select(MapToResponse).ToList();
         var pagedResult = new PagedResult<CompanyResponse>(items, total, page, pageSize);
@@ -68,7 +68,7 @@ public class CompaniesController : ControllerBase
             async () => await _unitOfWork.Companies.GetByIdAsync(id),
             TimeSpan.FromMinutes(SystemConstants.CacheExpirationMinutes));
         
-        if (company == null)
+        if (company == null || !BelongsToTenant(company))
         {
             throw new NotFoundException("Empresa", id);
         }
@@ -124,7 +124,7 @@ public class CompaniesController : ControllerBase
     {
         var company = await _unitOfWork.Companies.GetByIdAsync(id);
         
-        if (company == null)
+        if (company == null || !BelongsToTenant(company))
         {
             throw new NotFoundException("Empresa", id);
         }
@@ -152,7 +152,7 @@ public class CompaniesController : ControllerBase
     {
         var company = await _unitOfWork.Companies.GetByIdAsync(id);
         
-        if (company == null)
+        if (company == null || !BelongsToTenant(company))
         {
             throw new NotFoundException("Empresa", id);
         }
@@ -179,7 +179,7 @@ public class CompaniesController : ControllerBase
     {
         var company = await _unitOfWork.Companies.GetByIdAsync(id);
         
-        if (company == null)
+        if (company == null || !BelongsToTenant(company))
         {
             throw new NotFoundException("Empresa", id);
         }
@@ -205,7 +205,7 @@ public class CompaniesController : ControllerBase
     {
         var company = await _unitOfWork.Companies.GetByIdAsync(id);
         
-        if (company == null)
+        if (company == null || !BelongsToTenant(company))
         {
             throw new NotFoundException("Empresa", id);
         }
@@ -229,9 +229,9 @@ public class CompaniesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var exists = await _unitOfWork.Companies.ExistsAsync(id);
+        var company = await _unitOfWork.Companies.GetByIdAsync(id);
         
-        if (!exists)
+        if (company == null || !BelongsToTenant(company))
         {
             throw new NotFoundException("Empresa", id);
         }
@@ -243,6 +243,18 @@ public class CompaniesController : ControllerBase
         _logger.LogInformation("Empresa excluída: {CompanyId}", id);
         
         return Ok(ApiResponse.Ok(SuccessMessages.CompanyDeleted));
+    }
+    
+    // SuperAdmin não tem restrição de tenant; demais usuários só enxergam o próprio client
+    private Guid? GetTenantFilter()
+    {
+        return User.IsInRole("SuperAdmin") ? null : HttpContext.GetRequiredClientId();
+    }
+    
+    private bool BelongsToTenant(Company company)
+    {
+        var tenant = GetTenantFilter();
+        return tenant == null || company.ClientId == tenant.Value;
     }
     
     private static CompanyResponse MapToResponse(Company company)

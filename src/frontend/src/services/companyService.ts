@@ -60,6 +60,14 @@ export const companyService = {
     return response.data.data;
   },
 
+  async activateCompany(id: string): Promise<void> {
+    await api.post(`/companies/${id}/activate`);
+  },
+
+  async deactivateCompany(id: string): Promise<void> {
+    await api.post(`/companies/${id}/deactivate`);
+  },
+
   /**
    * Excluir uma empresa (soft delete)
    */

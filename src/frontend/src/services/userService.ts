@@ -79,6 +79,10 @@ export const userService = {
   /**
    * Ativa usuário
    */
+  deactivate: async (id: string): Promise<void> => {
+    await api.post(`${USERS_ENDPOINT}/${id}/deactivate`);
+  },
+
   activate: async (id: string): Promise<void> => {
     await api.post(`${USERS_ENDPOINT}/${id}/activate`);
   },

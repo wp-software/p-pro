@@ -6,7 +6,7 @@ using PartnershipManager.Domain.Interfaces.Billing;
 
 namespace PartnershipManager.API.Controllers;
 
-// [Authorize] // Temporariamente desabilitado para testes
+[Authorize(Roles = "SuperAdmin")]
 [ApiController]
 [Route("api/billing/clients")]
 public class BillingClientsController : ControllerBase

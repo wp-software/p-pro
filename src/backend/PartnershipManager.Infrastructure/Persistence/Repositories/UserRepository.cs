@@ -130,6 +130,35 @@ public class UserRepository : BaseRepository<User>, IUserRepository
         return (items, total);
     }
 
+    public async Task<(IEnumerable<User> Items, int Total)> GetPagedByClientAsync(
+        Guid clientId, int page, int pageSize, string? search = null)
+    {
+        var whereClause = "WHERE client_id = @ClientId AND is_deleted = 0";
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            whereClause += " AND (name LIKE @Search OR email LIKE @Search)";
+        }
+
+        var countSql = $"SELECT COUNT(*) FROM users {whereClause}";
+        var dataSql = $@"SELECT {SelectColumns}
+                         FROM users {whereClause}
+                         ORDER BY name
+                         LIMIT @PageSize OFFSET @Offset";
+
+        var parameters = new
+        {
+            ClientId = clientId.ToString(),
+            Search = $"%{search}%",
+            PageSize = pageSize,
+            Offset = (page - 1) * pageSize
+        };
+
+        var total = await Connection.ExecuteScalarAsync<int>(countSql, parameters, Transaction);
+        var items = await Connection.QueryAsync<User>(dataSql, parameters, Transaction);
+
+        return (items, total);
+    }
+
     public async Task AddAsync(User user)
     {
         var sql = @"INSERT INTO users 

@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react';
-import { Building2, Check, Plus, Search, Shield, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Building2, Check, Plus, Search, Settings, Shield, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, Card, Input } from '@/components/ui';
 import {
@@ -432,9 +433,12 @@ export default function CoreClientsPage() {
                         <div className="flex items-center gap-3">
                           <Building2 className="h-4 w-4 shrink-0 text-primary-500" />
                           <div>
-                            <p className="font-medium text-primary">
+                            <Link
+                              to={`/admin/clients/${client.id}`}
+                              className="font-medium text-primary hover:underline"
+                            >
                               {client.name}
-                            </p>
+                            </Link>
                             <p className="text-sm text-primary-500">
                               {client.email}
                             </p>
@@ -460,6 +464,15 @@ export default function CoreClientsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-2">
+                          <Link to={`/admin/clients/${client.id}`}>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              icon={<Settings className="h-3.5 w-3.5" />}
+                            >
+                              {t('coreClientOnboarding.manage')}
+                            </Button>
+                          </Link>
                           {client.status === 'Active' ? (
                             <>
                               <Button

@@ -1,7 +1,5 @@
-import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { clientService } from '@/services/clientService';
-import { useClientStore } from '@/stores/clientStore';
 import type {
   CreateClientRequest,
   OnboardClientRequest,
@@ -50,21 +48,38 @@ export function useClients(params?: {
  * Hook para obter um cliente específico
  */
 export function useClient(id: string) {
-  const { setCurrentClient } = useClientStore();
-
-  const query = useQuery({
+  return useQuery({
     queryKey: [...QUERY_KEY, id],
     queryFn: () => clientService.getClientById(id),
     enabled: !!id,
   });
+}
 
-  useEffect(() => {
-    if (query.data) {
-      setCurrentClient(query.data);
-    }
-  }, [query.data, setCurrentClient]);
+export function useClientUsers(
+  clientId: string,
+  params?: { page?: number; pageSize?: number; search?: string }
+) {
+  return useQuery({
+    queryKey: [...QUERY_KEY, clientId, 'users', params],
+    queryFn: () => clientService.getClientUsers(clientId, params),
+    enabled: !!clientId,
+  });
+}
 
-  return query;
+export function useUpdateClientEmail() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, email }: { id: string; email: string }) =>
+      clientService.updateClientEmail(id, email),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      toast.success('E-mail atualizado com sucesso');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Erro ao atualizar e-mail');
+    },
+  });
 }
 
 /**

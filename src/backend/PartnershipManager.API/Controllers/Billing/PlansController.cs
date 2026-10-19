@@ -6,7 +6,7 @@ using System.Text.Json;
 
 namespace PartnershipManager.API.Controllers.Billing;
 
-// [Authorize] // Temporariamente desabilitado para testes
+[Authorize(Roles = "SuperAdmin")]
 [ApiController]
 [Route("api/[controller]")]
 public class PlansController : ControllerBase

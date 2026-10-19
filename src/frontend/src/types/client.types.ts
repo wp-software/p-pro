@@ -72,9 +72,27 @@ export interface CoreClientPage {
 }
 
 export interface UpdateClientRequest {
-  name?: string;
-  email?: string;
+  name: string;
+  tradingName?: string;
   phone?: string;
+  logoUrl?: string;
+}
+
+export interface ClientDetail {
+  id: string;
+  name: string;
+  tradingName?: string;
+  document: string;
+  documentFormatted: string;
+  documentType: string;
+  email: string;
+  phone?: string;
+  logoUrl?: string;
+  status: string;
+  totalCompanies: number;
+  totalUsers: number;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export interface ClientListResponse {

@@ -107,3 +107,15 @@ public record ClientCompanyResponse
     public decimal Valuation { get; init; }
     public string Status { get; init; } = string.Empty;
 }
+
+/// <summary>
+/// DTO para convite de usuário em um cliente (SuperAdmin)
+/// </summary>
+public record CreateClientUserRequest
+{
+    public string Name { get; init; } = string.Empty;
+    public string Email { get; init; } = string.Empty;
+    public Guid CompanyId { get; init; }
+    public Role Role { get; init; } = Role.Viewer;
+    public string? Phone { get; init; }
+}

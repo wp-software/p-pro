@@ -53,7 +53,7 @@ public interface ICompanyRepository
     Task<Company?> GetByCnpjAsync(string cnpj);
     Task<bool> CnpjExistsAsync(string cnpj, Guid? excludeId = null);
     Task<IEnumerable<Company>> GetActiveCompaniesAsync();
-    Task<(IEnumerable<Company> Items, int Total)> GetPagedAsync(int page, int pageSize, string? search = null);
+    Task<(IEnumerable<Company> Items, int Total)> GetPagedAsync(int page, int pageSize, string? search = null, Guid? clientId = null);
     Task AddAsync(Company company);
     Task UpdateAsync(Company company);
     Task DeleteAsync(Guid id);
@@ -283,6 +283,7 @@ public interface IUserRepository
     Task<IEnumerable<User>> GetByCompanyAsync(Guid companyId);
     Task<IEnumerable<User>> GetActiveUsersByCompanyAsync(Guid companyId);
     Task<(IEnumerable<User> Items, int Total)> GetPagedByCompanyAsync(Guid companyId, int page, int pageSize, string? search = null);
+    Task<(IEnumerable<User> Items, int Total)> GetPagedByClientAsync(Guid clientId, int page, int pageSize, string? search = null);
     Task AddAsync(User user);
     Task UpdateAsync(User user);
     Task DeleteAsync(Guid id);

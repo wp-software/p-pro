@@ -1,6 +1,7 @@
 import { api } from './api';
 import {
   Client,
+  ClientDetail,
   CreateClientRequest,
   UpdateClientRequest,
   ClientCompany,
@@ -8,6 +9,7 @@ import {
   ClientOnboardingResponse,
   CoreClientPage,
 } from '@/types';
+import type { PagedResult, UserSummary } from '@/types';
 
 // Tipo para resposta wrapper da API
 interface ApiResponse<T> {
@@ -47,8 +49,8 @@ export const clientService = {
   /**
    * Obter detalhes de um cliente específico
    */
-  async getClientById(id: string): Promise<Client> {
-    const response = await api.get<ApiResponse<Client>>(`/clients/${id}`);
+  async getClientById(id: string): Promise<ClientDetail> {
+    const response = await api.get<ApiResponse<ClientDetail>>(`/clients/${id}`);
     return response.data.data;
   },
 
@@ -63,8 +65,32 @@ export const clientService = {
   /**
    * Atualizar um cliente existente
    */
-  async updateClient(id: string, data: UpdateClientRequest): Promise<Client> {
-    const response = await api.put<ApiResponse<Client>>(`/clients/${id}`, data);
+  async updateClient(id: string, data: UpdateClientRequest): Promise<ClientDetail> {
+    const response = await api.put<ApiResponse<ClientDetail>>(`/clients/${id}`, data);
+    return response.data.data;
+  },
+
+  async updateClientEmail(id: string, email: string): Promise<ClientDetail> {
+    const response = await api.patch<ApiResponse<ClientDetail>>(`/clients/${id}/email`, { email });
+    return response.data.data;
+  },
+
+  async createClientUser(
+    id: string,
+    data: { name: string; email: string; companyId: string; role: number }
+  ): Promise<UserSummary> {
+    const response = await api.post<ApiResponse<UserSummary>>(`/clients/${id}/users`, data);
+    return response.data.data;
+  },
+
+  async getClientUsers(
+    id: string,
+    params?: { page?: number; pageSize?: number; search?: string }
+  ): Promise<PagedResult<UserSummary>> {
+    const response = await api.get<ApiResponse<PagedResult<UserSummary>>>(
+      `/clients/${id}/users`,
+      { params }
+    );
     return response.data.data;
   },
 
