@@ -37,11 +37,27 @@ export enum MaritalStatus {
 // Import DocumentType for local use
 import { DocumentType } from './client.types';
 
+export interface ShareholderCompanyConfig {
+  id: string;
+  name?: string;
+  type: ShareholderType;
+  earnOut: boolean;
+  tagAlong: boolean;
+  dragAlong: boolean;
+  shareholdersAgreement: boolean;
+  rightOfFirstRefusal: boolean;
+  liquidationPreferenceRight: boolean;
+  antiDilution: boolean;
+}
+
+export type ShareholderCompanyRequest = Omit<ShareholderCompanyConfig, 'id' | 'name'> & { companyId: string };
+
 export interface Shareholder {
   id: string;
   clientId: string;
   companyId: string;
   companyName: string;
+  companies?: ShareholderCompanyConfig[];
   name: string;
   document: string;
   documentFormatted: string;
@@ -83,6 +99,7 @@ export interface ShareholderListResponse {
 
 export interface CreateShareholderRequest {
   companyId: string;
+  companies?: ShareholderCompanyRequest[];
   name: string;
   document: string;
   documentType: DocumentType;
@@ -110,6 +127,7 @@ export interface CreateShareholderRequest {
 
 export interface UpdateShareholderRequest {
   companyId?: string;
+  companies?: ShareholderCompanyRequest[];
   name: string;
   document?: string;
   documentType?: DocumentType;

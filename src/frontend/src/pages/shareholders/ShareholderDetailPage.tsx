@@ -129,7 +129,9 @@ export default function ShareholderDetailPage() {
               </div>
               <div>
                 <p className="text-sm text-primary-500">Empresa</p>
-                <p className="font-medium text-primary">{shareholder.companyName}</p>
+                <p className="font-medium text-primary">{shareholder.companies && shareholder.companies.length > 1
+                    ? shareholder.companies.map((c) => c.name).join(', ')
+                    : shareholder.companyName}</p>
               </div>
             </div>
 

@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Users, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Upload, Users, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button, Card, Spinner, StatCard } from '@/components/ui';
-import { ShareholderCard, ShareholderFilters, ShareholderFormModal } from '@/components/shareholders';
+import { ShareholderCard, ShareholderFilters, ShareholderFormModal, ImportShareholdersModal } from '@/components/shareholders';
 import { useShareholders, useDeleteShareholder } from '@/hooks/useShareholders';
+import { useAuthStore } from '@/stores/authStore';
 import { useConfirm } from '@/components/ui';
 import {
   ShareholderType,
@@ -16,6 +17,8 @@ export default function ShareholdersListPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { confirm } = useConfirm();
+  const isAdmin = useAuthStore((s) => s.user?.roles?.includes('Admin') ?? false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -110,9 +113,16 @@ export default function ShareholdersListPage() {
             {t('shareholders.manageSubtitle')}
           </p>
         </div>
-        <Button icon={<Plus className="w-5 h-5" />} onClick={handleAddNew}>
-          {t('shareholders.addShareholder')}
-        </Button>
+        <div className="flex gap-2">
+          {isAdmin && (
+            <Button variant="secondary" icon={<Upload className="w-5 h-5" />} onClick={() => setIsImportOpen(true)}>
+              Importar sócios
+            </Button>
+          )}
+          <Button icon={<Plus className="w-5 h-5" />} onClick={handleAddNew}>
+            {t('shareholders.addShareholder')}
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -266,6 +276,8 @@ export default function ShareholdersListPage() {
         onClose={handleCloseModal}
         shareholder={editingShareholder}
       />
+
+      {isAdmin && <ImportShareholdersModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} />}
     </div>
   );
 }

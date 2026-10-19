@@ -83,7 +83,24 @@ public interface IShareholderRepository
     Task UpdateAsync(Shareholder shareholder);
     Task SoftDeleteAsync(Guid id, Guid clientId, Guid? deletedBy = null);
     Task<bool> ExistsAsync(Guid id, Guid clientId);
+    Task<Dictionary<Guid, List<ShareholderCompanyLink>>> GetCompanyLinksAsync(IEnumerable<Guid> shareholderIds);
+    Task UpsertCompanyLinkAsync(Guid shareholderId, Guid clientId, ShareholderCompanyConfig config);
+    Task RemoveCompanyLinkAsync(Guid shareholderId, Guid companyId);
+    Task<bool> HasPositionInCompanyAsync(Guid shareholderId, Guid companyId);
 }
+
+public record ShareholderCompanyConfig(
+    Guid CompanyId,
+    ShareholderType Type,
+    bool EarnOut,
+    bool TagAlong,
+    bool DragAlong,
+    bool ShareholdersAgreement,
+    bool RightOfFirstRefusal,
+    bool LiquidationPreferenceRight,
+    bool AntiDilution);
+
+public record ShareholderCompanyLink(Guid CompanyId, string CompanyName, ShareholderCompanyConfig Config);
 
 /// <summary>
 /// Repositório de classes de ações

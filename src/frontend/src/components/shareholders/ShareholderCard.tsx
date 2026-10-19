@@ -46,7 +46,9 @@ export function ShareholderCard({
           </h3>
           <p className="text-sm text-primary-500 truncate flex items-center gap-1">
             <Building2 className="w-3.5 h-3.5" />
-            {shareholder.companyName}
+            {shareholder.companies && shareholder.companies.length > 1
+              ? shareholder.companies.map((c) => c.name).join(', ')
+              : shareholder.companyName}
           </p>
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             <ShareholderTypeBadge type={shareholder.type} />

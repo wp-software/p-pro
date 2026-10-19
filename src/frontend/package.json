@@ -19,6 +19,7 @@
     "axios": "^1.7.3",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
+    "exceljs": "^4.4.0",
     "html2canvas": "^1.4.1",
     "i18next": "^25.10.5",
     "i18next-browser-languagedetector": "^8.2.1",

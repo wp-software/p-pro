@@ -38,7 +38,7 @@ public class ShareholderRepository : IShareholderRepository
 
         if (companyId.HasValue)
         {
-            baseQuery.Append(" AND sh.company_id = @CompanyId");
+            baseQuery.Append(" AND EXISTS (SELECT 1 FROM shareholder_companies sc WHERE sc.shareholder_id = sh.id AND sc.company_id = @CompanyId)");
             parameters.Add("CompanyId", companyId.Value.ToString());
         }
 
@@ -438,6 +438,98 @@ public class ShareholderRepository : IShareholderRepository
             ClientId = clientId.ToString()
         }, Transaction);
         return count > 0;
+    }
+
+    public async Task<Dictionary<Guid, List<ShareholderCompanyLink>>> GetCompanyLinksAsync(IEnumerable<Guid> shareholderIds)
+    {
+        var ids = shareholderIds.Select(i => i.ToString()).ToList();
+        var result = new Dictionary<Guid, List<ShareholderCompanyLink>>();
+        if (ids.Count == 0) return result;
+
+        var rows = await Connection.QueryAsync<dynamic>(
+            @"SELECT sc.shareholder_id AS ShareholderId, sc.company_id AS CompanyId, c.name AS CompanyName,
+                     sc.type AS Type, sc.earn_out AS EarnOut, sc.tag_along AS TagAlong, sc.drag_along AS DragAlong,
+                     sc.shareholders_agreement AS ShareholdersAgreement,
+                     sc.right_of_first_refusal AS RightOfFirstRefusal,
+                     sc.liquidation_preference_right AS LiquidationPreferenceRight,
+                     sc.anti_dilution AS AntiDilution
+              FROM shareholder_companies sc
+              JOIN companies c ON c.id = sc.company_id
+              WHERE sc.shareholder_id IN @Ids
+              ORDER BY c.name",
+            new { Ids = ids }, Transaction);
+
+        foreach (var row in rows)
+        {
+            var key = Guid.Parse((string)row.ShareholderId.ToString());
+            if (!result.TryGetValue(key, out var list))
+            {
+                list = new List<ShareholderCompanyLink>();
+                result[key] = list;
+            }
+            var companyId = Guid.Parse((string)row.CompanyId.ToString());
+            var config = new ShareholderCompanyConfig(
+                companyId,
+                Enum.TryParse<ShareholderType>((string)row.Type.ToString(), true, out ShareholderType t) ? t : ShareholderType.Other,
+                Convert.ToBoolean(row.EarnOut),
+                Convert.ToBoolean(row.TagAlong),
+                Convert.ToBoolean(row.DragAlong),
+                Convert.ToBoolean(row.ShareholdersAgreement),
+                Convert.ToBoolean(row.RightOfFirstRefusal),
+                Convert.ToBoolean(row.LiquidationPreferenceRight),
+                Convert.ToBoolean(row.AntiDilution));
+            list.Add(new ShareholderCompanyLink(companyId, (string)row.CompanyName, config));
+        }
+        return result;
+    }
+
+    public async Task UpsertCompanyLinkAsync(Guid shareholderId, Guid clientId, ShareholderCompanyConfig config)
+    {
+        await Connection.ExecuteAsync(
+            @"INSERT INTO shareholder_companies
+                (shareholder_id, company_id, client_id, type, earn_out, tag_along, drag_along,
+                 shareholders_agreement, right_of_first_refusal, liquidation_preference_right, anti_dilution)
+              VALUES
+                (@ShareholderId, @CompanyId, @ClientId, @Type, @EarnOut, @TagAlong, @DragAlong,
+                 @ShareholdersAgreement, @RightOfFirstRefusal, @LiquidationPreferenceRight, @AntiDilution)
+              ON DUPLICATE KEY UPDATE
+                type = VALUES(type), earn_out = VALUES(earn_out), tag_along = VALUES(tag_along),
+                drag_along = VALUES(drag_along), shareholders_agreement = VALUES(shareholders_agreement),
+                right_of_first_refusal = VALUES(right_of_first_refusal),
+                liquidation_preference_right = VALUES(liquidation_preference_right),
+                anti_dilution = VALUES(anti_dilution)",
+            new
+            {
+                ShareholderId = shareholderId.ToString(),
+                CompanyId = config.CompanyId.ToString(),
+                ClientId = clientId.ToString(),
+                Type = config.Type.ToString(),
+                config.EarnOut,
+                config.TagAlong,
+                config.DragAlong,
+                config.ShareholdersAgreement,
+                config.RightOfFirstRefusal,
+                config.LiquidationPreferenceRight,
+                config.AntiDilution
+            },
+            Transaction);
+    }
+
+    public async Task<bool> HasPositionInCompanyAsync(Guid shareholderId, Guid companyId)
+    {
+        var count = await Connection.ExecuteScalarAsync<int>(
+            @"SELECT (SELECT COUNT(1) FROM shares WHERE shareholder_id = @ShareholderId AND company_id = @CompanyId AND is_deleted = 0)
+                   + (SELECT COUNT(1) FROM vesting_grants WHERE shareholder_id = @ShareholderId AND company_id = @CompanyId AND is_deleted = 0)",
+            new { ShareholderId = shareholderId.ToString(), CompanyId = companyId.ToString() }, Transaction);
+        return count > 0;
+    }
+
+    public async Task RemoveCompanyLinkAsync(Guid shareholderId, Guid companyId)
+    {
+        await Connection.ExecuteAsync(
+            "DELETE FROM shareholder_companies WHERE shareholder_id = @ShareholderId AND company_id = @CompanyId",
+            new { ShareholderId = shareholderId.ToString(), CompanyId = companyId.ToString() },
+            Transaction);
     }
 
     private static Shareholder MapToShareholder(dynamic row)

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { X, HelpCircle } from 'lucide-react';
+import { X, Plus, Trash2 } from 'lucide-react';
 import { Button, Input } from '@/components/ui';
 import {
   ShareholderType,
@@ -54,6 +55,34 @@ const brazilStates = [
   'SE',
   'TO',
 ];
+
+type GovernanceFlags = {
+  earnOut: boolean;
+  tagAlong: boolean;
+  dragAlong: boolean;
+  shareholdersAgreement: boolean;
+  rightOfFirstRefusal: boolean;
+  liquidationPreferenceRight: boolean;
+  antiDilution: boolean;
+};
+
+type CompanyRow = GovernanceFlags & { companyId: string; type: ShareholderType };
+
+const pickFlags = (s: Partial<GovernanceFlags>): GovernanceFlags => ({
+  earnOut: !!s.earnOut,
+  tagAlong: !!s.tagAlong,
+  dragAlong: !!s.dragAlong,
+  shareholdersAgreement: !!s.shareholdersAgreement,
+  rightOfFirstRefusal: !!s.rightOfFirstRefusal,
+  liquidationPreferenceRight: !!s.liquidationPreferenceRight,
+  antiDilution: !!s.antiDilution,
+});
+
+const newCompanyRow = (companyId = ''): CompanyRow => ({
+  companyId,
+  type: ShareholderType.Investor,
+  ...pickFlags({}),
+});
 
 // Validation schema
 const shareholderSchema = z
@@ -158,6 +187,7 @@ export function ShareholderFormModal({
   const { user } = useAuthStore();
   const { selectedCompanyId } = useClientStore();
   const { data: companiesData } = useClientCompanies(user?.clientId || '');
+  const [companyRows, setCompanyRows] = useState<CompanyRow[]>([]);
 
   const createMutation = useCreateShareholder();
   const updateMutation = useUpdateShareholder();
@@ -204,6 +234,14 @@ export function ShareholderFormModal({
 
   // Populate form when editing
   useEffect(() => {
+    if (shareholder) {
+      const rows = (shareholder.companies?.length ? shareholder.companies : [{ id: shareholder.companyId, ...pickFlags(shareholder), type: shareholder.type }])
+        .map((c) => ({ companyId: c.id, ...pickFlags(c), type: c.type }));
+      rows.sort((a, b) => Number(b.companyId === shareholder.companyId) - Number(a.companyId === shareholder.companyId));
+      setCompanyRows(rows);
+    } else {
+      setCompanyRows([newCompanyRow(selectedCompanyId || user?.companyId || '')]);
+    }
     if (shareholder) {
       reset({
         companyId: shareholder.companyId,
@@ -265,22 +303,47 @@ export function ShareholderFormModal({
 
   const [isCepLoading, setIsCepLoading] = useState(false);
   const [lastFetchedCep, setLastFetchedCep] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'governance' | 'qualification'>('governance');
+  const [activeTab, setActiveTab] = useState<'governance' | 'qualification'>('qualification');
+
+  useEffect(() => {
+    if (isOpen) setActiveTab('qualification');
+  }, [isOpen]);
+
+  useEffect(() => {
+    setValue('companyId', companyRows[0]?.companyId ?? '', { shouldValidate: false });
+  }, [companyRows, setValue]);
+
+  const updateRow = (index: number, patch: Partial<CompanyRow>) =>
+    setCompanyRows((rows) => rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
 
   const onSubmit = async (data: ShareholderFormData) => {
+    if (companyRows.length === 0 || companyRows.some((r) => !r.companyId)) {
+      toast.error('Selecione a empresa em todas as linhas da configuração societária');
+      setActiveTab('governance');
+      return;
+    }
+    if (new Set(companyRows.map((r) => r.companyId)).size !== companyRows.length) {
+      toast.error('Há empresas repetidas na configuração societária');
+      setActiveTab('governance');
+      return;
+    }
+    const primary = companyRows[0];
+    const companiesPayload = companyRows.map(({ companyId, type, ...flags }) => ({ companyId, type, ...flags }));
+
     try {
       const normalizedZipCode = normalizeDocument(data.addressZipCode);
       const normalizedState = data.addressState?.trim().toUpperCase();
       const normalizedDocument = normalizeDocument(data.document);
 
       if (isEditing && shareholder) {
-        const effectiveCompanyId = data.companyId || shareholder.companyId;
+        const effectiveCompanyId = shareholder.companyId;
         const updateData: UpdateShareholderRequest = {
           companyId: effectiveCompanyId,
+          companies: companiesPayload,
           name: data.name,
           document: normalizedDocument,
           documentType: data.documentType,
-          type: data.type,
+          type: primary.type,
           status: data.status || ShareholderStatus.Active,
           email: data.email || undefined,
           phone: data.phone || undefined,
@@ -294,23 +357,24 @@ export function ShareholderFormModal({
           maritalStatus: data.maritalStatus,
           gender: data.gender,
           birthDate: data.birthDate || undefined,
-          earnOut: data.earnOut,
-          tagAlong: data.tagAlong,
-          dragAlong: data.dragAlong,
-          shareholdersAgreement: data.shareholdersAgreement,
-          rightOfFirstRefusal: data.rightOfFirstRefusal,
-          liquidationPreferenceRight: data.liquidationPreferenceRight,
-          antiDilution: data.antiDilution,
+          earnOut: primary.earnOut,
+          tagAlong: primary.tagAlong,
+          dragAlong: primary.dragAlong,
+          shareholdersAgreement: primary.shareholdersAgreement,
+          rightOfFirstRefusal: primary.rightOfFirstRefusal,
+          liquidationPreferenceRight: primary.liquidationPreferenceRight,
+          antiDilution: primary.antiDilution,
         };
         await updateMutation.mutateAsync({ id: shareholder.id, data: updateData });
       } else {
-        const effectiveCompanyId = data.companyId || selectedCompanyId || user?.companyId || '';
+        const effectiveCompanyId = primary.companyId;
         const createData: CreateShareholderRequest = {
           companyId: effectiveCompanyId,
+          companies: companiesPayload,
           name: data.name,
           document: normalizedDocument,
           documentType: data.documentType,
-          type: data.type,
+          type: primary.type,
           email: data.email || undefined,
           phone: data.phone || undefined,
           notes: data.notes || undefined,
@@ -323,13 +387,13 @@ export function ShareholderFormModal({
           maritalStatus: data.maritalStatus,
           gender: data.gender,
           birthDate: data.birthDate || undefined,
-          earnOut: data.earnOut,
-          tagAlong: data.tagAlong,
-          dragAlong: data.dragAlong,
-          shareholdersAgreement: data.shareholdersAgreement,
-          rightOfFirstRefusal: data.rightOfFirstRefusal,
-          liquidationPreferenceRight: data.liquidationPreferenceRight,
-          antiDilution: data.antiDilution,
+          earnOut: primary.earnOut,
+          tagAlong: primary.tagAlong,
+          dragAlong: primary.dragAlong,
+          shareholdersAgreement: primary.shareholdersAgreement,
+          rightOfFirstRefusal: primary.rightOfFirstRefusal,
+          liquidationPreferenceRight: primary.liquidationPreferenceRight,
+          antiDilution: primary.antiDilution,
         };
         await createMutation.mutateAsync(createData);
       }
@@ -384,18 +448,18 @@ export function ShareholderFormModal({
   if (!isOpen) return null;
 
   // Helper for governance toggle rows
-  const governanceFields: { field: keyof ShareholderFormData; label: string; help: string }[] = [
-    { field: 'earnOut', label: 'Earn-out', help: 'Parte do pagamento vinculada a resultados futuros da empresa' },
-    { field: 'tagAlong', label: 'Tag Along', help: 'Direito de vender junto se o controlador vender' },
-    { field: 'dragAlong', label: 'Drag Along', help: 'Obrigação de vender junto (proteção do majoritário)' },
-    { field: 'shareholdersAgreement', label: 'Shareholders Agreement', help: 'Acordo de sócios que define regras de governança' },
-    { field: 'rightOfFirstRefusal', label: 'Direitos de preferência (ROFR)', help: 'Prioridade de compra antes de terceiros' },
-    { field: 'liquidationPreferenceRight', label: 'Liquidation Preference', help: 'Prioridade de recebimento em caso de venda/liquidação' },
-    { field: 'antiDilution', label: 'Anti-diluição', help: 'Proteção contra diluição em rodadas futuras a preço menor' },
+  const governanceFields: { field: keyof GovernanceFlags; short: string; label: string; help: string }[] = [
+    { field: 'earnOut', short: 'Earn-out', label: 'Earn-out', help: 'Parte do pagamento vinculada a resultados futuros da empresa' },
+    { field: 'tagAlong', short: 'Tag Along', label: 'Tag Along', help: 'Direito de vender junto se o controlador vender' },
+    { field: 'dragAlong', short: 'Drag Along', label: 'Drag Along', help: 'Obrigação de vender junto (proteção do majoritário)' },
+    { field: 'shareholdersAgreement', short: 'Acordo', label: 'Shareholders Agreement', help: 'Acordo de sócios que define regras de governança' },
+    { field: 'rightOfFirstRefusal', short: 'ROFR', label: 'Direitos de preferência (ROFR)', help: 'Prioridade de compra antes de terceiros' },
+    { field: 'liquidationPreferenceRight', short: 'Liq. Pref.', label: 'Liquidation Preference', help: 'Prioridade de recebimento em caso de venda/liquidação' },
+    { field: 'antiDilution', short: 'Anti-dil.', label: 'Anti-diluição', help: 'Proteção contra diluição em rodadas futuras a preço menor' },
   ];
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-50 overflow-hidden">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/50 transition-opacity"
@@ -403,10 +467,10 @@ export function ShareholderFormModal({
       />
 
       {/* Modal */}
-      <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative bg-white rounded-xl shadow-xl w-full max-w-4xl transform transition-all">
+      <div className="flex h-full items-center justify-center p-4">
+        <div className="relative bg-white rounded-xl shadow-xl w-full max-w-5xl h-[min(90vh,760px)] flex flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b">
+          <div className="flex items-center justify-between p-6 border-b flex-shrink-0">
             <h2 className="text-lg font-semibold text-primary">
               {isEditing ? 'Editar Sócio' : 'Novo Sócio'}
             </h2>
@@ -419,7 +483,7 @@ export function ShareholderFormModal({
           </div>
 
           {/* Tabs */}
-          <div className="border-b border-gray-200 px-6">
+          <div className="border-b border-gray-200 px-6 flex-shrink-0">
             <nav className="-mb-px flex gap-1">
               {([
                 { id: 'qualification', label: 'Qualificação' },
@@ -442,7 +506,8 @@ export function ShareholderFormModal({
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit(onSubmit)}>
+          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
+            <div className="flex-1 overflow-y-auto min-h-0">
             {/* Tab: Qualificação */}
             {activeTab === 'qualification' && (
               <div className="p-6 space-y-4">
@@ -593,89 +658,124 @@ export function ShareholderFormModal({
 
             {/* Tab: Configuração Societária */}
             {activeTab === 'governance' && (
-              <div className="p-6 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Company */}
+              <div className="p-6 space-y-4">
+                <div className="flex items-center justify-between">
                   <div>
-                    <label className="input-label">Empresa *</label>
-                    <select
-                      {...register('companyId')}
-                      className="input"
-                      disabled={isEditing}
-                    >
-                      <option value="">Selecione uma empresa</option>
-                      {companiesData?.map((company) => (
-                        <option key={company.id} value={company.id}>
-                          {company.name}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.companyId && (
-                      <p className="input-error-message">{errors.companyId.message}</p>
-                    )}
+                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                      Participação nas empresas do grupo
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Adicione cada empresa e defina o tipo de sócio e as cláusulas aplicáveis nela.
+                      A primeira linha é a empresa principal.
+                    </p>
                   </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    icon={<Plus className="w-4 h-4" />}
+                    onClick={() => setCompanyRows((rows) => [...rows, newCompanyRow()])}
+                  >
+                    Adicionar empresa
+                  </Button>
+                </div>
 
-                  {/* Tipo de Sócio */}
-                  <div>
-                    <label className="input-label">Tipo de Sócio *</label>
-                    <select {...register('type', { valueAsNumber: true })} className="input">
-                      {Object.entries(shareholderTypeLabels).map(([value, label]) => (
+                {isEditing && (
+                  <div className="max-w-xs">
+                    <label className="input-label">Status</label>
+                    <select {...register('status', { valueAsNumber: true })} className="input">
+                      {Object.entries(shareholderStatusLabels).map(([value, label]) => (
                         <option key={value} value={value}>{label}</option>
                       ))}
                     </select>
                   </div>
+                )}
 
-                  {/* Status (only when editing) */}
-                  {isEditing && (
-                    <div>
-                      <label className="input-label">Status</label>
-                      <select {...register('status', { valueAsNumber: true })} className="input">
-                        {Object.entries(shareholderStatusLabels).map(([value, label]) => (
-                          <option key={value} value={value}>{label}</option>
+                <div className="overflow-x-auto border rounded-lg">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-50 text-xs text-gray-600">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium min-w-[220px]">Empresa *</th>
+                        <th className="px-3 py-2 text-left font-medium min-w-[130px]">Tipo *</th>
+                        {governanceFields.map(({ field, short, label, help }) => (
+                          <th key={field} className="px-2 py-2 text-center font-medium" title={`${label}: ${help}`}>
+                            {short}
+                          </th>
                         ))}
-                      </select>
-                    </div>
-                  )}
+                        <th className="px-2 py-2" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {companyRows.map((row, index) => {
+                        const isLockedPrimary = isEditing && index === 0;
+                        return (
+                          <tr key={index}>
+                            <td className="px-3 py-2">
+                              <select
+                                className="input"
+                                value={row.companyId}
+                                disabled={isLockedPrimary}
+                                onChange={(e) => updateRow(index, { companyId: e.target.value })}
+                              >
+                                <option value="">Selecione</option>
+                                {companiesData?.map((company) => (
+                                  <option
+                                    key={company.id}
+                                    value={company.id}
+                                    disabled={company.id !== row.companyId && companyRows.some((r) => r.companyId === company.id)}
+                                  >
+                                    {company.name}
+                                  </option>
+                                ))}
+                              </select>
+                              {index === 0 && <span className="text-xs text-gray-500">Principal</span>}
+                            </td>
+                            <td className="px-3 py-2">
+                              <select
+                                className="input"
+                                value={row.type}
+                                onChange={(e) => updateRow(index, { type: Number(e.target.value) as ShareholderType })}
+                              >
+                                {Object.entries(shareholderTypeLabels).map(([value, label]) => (
+                                  <option key={value} value={value}>{label}</option>
+                                ))}
+                              </select>
+                            </td>
+                            {governanceFields.map(({ field, label }) => (
+                              <td key={field} className="px-2 py-2 text-center">
+                                <input
+                                  type="checkbox"
+                                  aria-label={label}
+                                  checked={row[field]}
+                                  onChange={(e) => updateRow(index, { [field]: e.target.checked })}
+                                />
+                              </td>
+                            ))}
+                            <td className="px-2 py-2 text-center">
+                              {!isLockedPrimary && companyRows.length > 1 && (
+                                <button
+                                  type="button"
+                                  aria-label="Remover empresa"
+                                  className="text-gray-400 hover:text-red-600"
+                                  onClick={() => setCompanyRows((rows) => rows.filter((_, i) => i !== index))}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-
-                {/* Governance Toggles */}
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">
-                    Cláusulas e Direitos Societários
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {governanceFields.map(({ field, label, help }) => (
-                      <label
-                        key={field}
-                        className="flex items-start gap-3 p-3 rounded-lg border border-transparent hover:bg-gray-50 hover:border-gray-200 cursor-pointer group transition-colors"
-                      >
-                        {/* Toggle switch */}
-                        <div className="relative flex items-center mt-0.5 flex-shrink-0">
-                          <input
-                            type="checkbox"
-                            {...register(field)}
-                            className="sr-only peer"
-                          />
-                          <div className="w-10 h-6 bg-gray-200 rounded-full peer peer-focus:ring-2 peer-focus:ring-primary-400 peer-checked:bg-primary-600 transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-4 after:shadow-sm" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm font-medium text-gray-900 block">{label}</span>
-                          <span className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                            <HelpCircle className="w-3 h-3 flex-shrink-0" />
-                            {help}
-                          </span>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </div>
+                <p className="text-xs text-gray-500">Passe o mouse sobre o título da coluna para ver a descrição da cláusula.</p>
               </div>
             )}
 
-
+            </div>
 
             {/* Actions — always visible */}
-            <div className="flex justify-end gap-3 p-6 pt-4 border-t">
+            <div className="flex justify-end gap-3 p-6 pt-4 border-t flex-shrink-0">
               <Button type="button" variant="secondary" onClick={onClose}>
                 Cancelar
               </Button>

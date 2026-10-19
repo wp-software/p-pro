@@ -32,7 +32,9 @@ public class ShareholderService : IShareholderService
     public async Task<ShareholderListResponse> GetPagedAsync(Guid clientId, Guid? companyId, int page, int pageSize, string? search, string? type, string? status)
     {
         var (items, total) = await _shareholderRepository.GetPagedAsync(clientId, companyId, page, pageSize, search, type, status);
-        var responseItems = items.Select(MapToResponse);
+        var itemList = items.ToList();
+        var links = await _shareholderRepository.GetCompanyLinksAsync(itemList.Select(i => i.Id));
+        var responseItems = itemList.Select(i => MapToResponse(i, links.GetValueOrDefault(i.Id)));
         return new ShareholderListResponse(responseItems, total, page, pageSize);
     }
 
@@ -43,7 +45,13 @@ public class ShareholderService : IShareholderService
         {
             throw new NotFoundException("Shareholder", id);
         }
-        return MapToResponse(shareholder);
+        return await MapWithCompaniesAsync(shareholder);
+    }
+
+    private async Task<ShareholderResponse> MapWithCompaniesAsync(Shareholder shareholder)
+    {
+        var links = await _shareholderRepository.GetCompanyLinksAsync(new[] { shareholder.Id });
+        return MapToResponse(shareholder, links.GetValueOrDefault(shareholder.Id));
     }
 
     public async Task<ShareholderResponse> CreateAsync(Guid clientId, CreateShareholderRequest request, Guid? userId = null)
@@ -54,10 +62,20 @@ public class ShareholderService : IShareholderService
             throw new NotFoundException("Company", request.CompanyId);
         }
 
-        var documentExists = await _shareholderRepository.DocumentExistsAsync(clientId, request.Document);
-        if (documentExists)
+        // Mesma pessoa em outra empresa do grupo: apenas adiciona o vínculo
+        var existing = await _shareholderRepository.GetByDocumentAsync(clientId, request.Document);
+        if (existing != null)
         {
-            throw new ConflictException("Documento já cadastrado para este cliente");
+            var existingLinks = await _shareholderRepository.GetCompanyLinksAsync(new[] { existing.Id });
+            if (existingLinks.GetValueOrDefault(existing.Id)?.Any(l => l.CompanyId == request.CompanyId) == true)
+            {
+                throw new ConflictException("Sócio já vinculado a esta empresa");
+            }
+
+            await UpsertCompaniesAsync(existing, clientId, BuildConfigs(request.CompanyId, request.Type, request.EarnOut,
+                request.TagAlong, request.DragAlong, request.ShareholdersAgreement, request.RightOfFirstRefusal,
+                request.LiquidationPreferenceRight, request.AntiDilution, request.Companies));
+            return await MapWithCompaniesAsync(existing);
         }
 
         var shareholder = Shareholder.Create(
@@ -92,8 +110,11 @@ public class ShareholderService : IShareholderService
         shareholder.SetCompanyName(company.Name);
 
         await _shareholderRepository.AddAsync(shareholder);
+        await UpsertCompaniesAsync(shareholder, clientId, BuildConfigs(request.CompanyId, request.Type, request.EarnOut,
+            request.TagAlong, request.DragAlong, request.ShareholdersAgreement, request.RightOfFirstRefusal,
+            request.LiquidationPreferenceRight, request.AntiDilution, request.Companies));
 
-        return MapToResponse(shareholder);
+        return await MapWithCompaniesAsync(shareholder);
     }
 
     public async Task<ShareholderResponse> UpdateAsync(Guid id, Guid clientId, UpdateShareholderRequest request, Guid? userId = null)
@@ -124,6 +145,21 @@ public class ShareholderService : IShareholderService
             shareholder.UpdateDocument(request.Document, request.DocumentType.Value, userId);
         }
 
+        var configs = BuildConfigs(shareholder.CompanyId, request.Type, request.EarnOut, request.TagAlong,
+            request.DragAlong, request.ShareholdersAgreement, request.RightOfFirstRefusal,
+            request.LiquidationPreferenceRight, request.AntiDilution, request.Companies);
+        var toRemove = request.Companies is { Count: > 0 }
+            ? await GetLinksToRemoveAsync(shareholder, configs)
+            : new List<ShareholderCompanyLink>();
+        foreach (var link in toRemove)
+        {
+            if (await _shareholderRepository.HasPositionInCompanyAsync(shareholder.Id, link.CompanyId))
+            {
+                throw new ConflictException(
+                    $"Não é possível remover a empresa \"{link.CompanyName}\": o sócio possui ações ou vesting nela.");
+            }
+        }
+
         shareholder.UpdateInfo(
             request.Name,
             request.Email ?? shareholder.Email,
@@ -151,7 +187,61 @@ public class ShareholderService : IShareholderService
 
         await _shareholderRepository.UpdateAsync(shareholder);
 
-        return MapToResponse(shareholder);
+        await UpsertCompaniesAsync(shareholder, clientId, configs);
+        foreach (var link in toRemove)
+        {
+            await _shareholderRepository.RemoveCompanyLinkAsync(shareholder.Id, link.CompanyId);
+        }
+
+        return await MapWithCompaniesAsync(shareholder);
+    }
+
+    // A empresa principal sempre vem primeiro e usa os dados de nível superior quando não listada
+    private static List<ShareholderCompanyConfig> BuildConfigs(
+        Guid primaryCompanyId, ShareholderType type, bool earnOut, bool tagAlong, bool dragAlong,
+        bool shareholdersAgreement, bool rightOfFirstRefusal, bool liquidationPreferenceRight, bool antiDilution,
+        List<ShareholderCompanyConfigRequest>? companies)
+    {
+        var configs = (companies ?? new List<ShareholderCompanyConfigRequest>())
+            .GroupBy(c => c.CompanyId)
+            .Select(g => g.Last())
+            .Select(c => new ShareholderCompanyConfig(c.CompanyId, c.Type, c.EarnOut, c.TagAlong, c.DragAlong,
+                c.ShareholdersAgreement, c.RightOfFirstRefusal, c.LiquidationPreferenceRight, c.AntiDilution))
+            .ToList();
+
+        if (configs.All(c => c.CompanyId != primaryCompanyId))
+        {
+            configs.Insert(0, new ShareholderCompanyConfig(primaryCompanyId, type, earnOut, tagAlong, dragAlong,
+                shareholdersAgreement, rightOfFirstRefusal, liquidationPreferenceRight, antiDilution));
+        }
+        return configs;
+    }
+
+    private async Task UpsertCompaniesAsync(Shareholder shareholder, Guid clientId, List<ShareholderCompanyConfig> configs)
+    {
+        foreach (var config in configs)
+        {
+            var company = await _companyRepository.GetByIdAsync(config.CompanyId);
+            if (company == null || company.ClientId != clientId)
+            {
+                throw new NotFoundException("Company", config.CompanyId);
+            }
+        }
+
+        foreach (var config in configs)
+        {
+            await _shareholderRepository.UpsertCompanyLinkAsync(shareholder.Id, clientId, config);
+        }
+    }
+
+    private async Task<List<ShareholderCompanyLink>> GetLinksToRemoveAsync(Shareholder shareholder, List<ShareholderCompanyConfig> configs)
+    {
+        var current = (await _shareholderRepository.GetCompanyLinksAsync(new[] { shareholder.Id }))
+            .GetValueOrDefault(shareholder.Id) ?? new List<ShareholderCompanyLink>();
+
+        return current
+            .Where(c => c.CompanyId != shareholder.CompanyId && configs.All(d => d.CompanyId != c.CompanyId))
+            .ToList();
     }
 
     public async Task DeleteAsync(Guid id, Guid clientId, Guid? userId = null)
@@ -164,7 +254,7 @@ public class ShareholderService : IShareholderService
         await _shareholderRepository.SoftDeleteAsync(id, clientId, userId);
     }
 
-    private static ShareholderResponse MapToResponse(Shareholder shareholder)
+    private static ShareholderResponse MapToResponse(Shareholder shareholder, List<ShareholderCompanyLink>? links = null)
     {
         return new ShareholderResponse
         {
@@ -172,6 +262,10 @@ public class ShareholderService : IShareholderService
             ClientId = shareholder.ClientId,
             CompanyId = shareholder.CompanyId,
             CompanyName = shareholder.CompanyName ?? string.Empty,
+            Companies = (links ?? new List<ShareholderCompanyLink>())
+                .Select(l => new ShareholderCompanyDto(l.CompanyId, l.CompanyName, l.Config.Type, l.Config.EarnOut,
+                    l.Config.TagAlong, l.Config.DragAlong, l.Config.ShareholdersAgreement,
+                    l.Config.RightOfFirstRefusal, l.Config.LiquidationPreferenceRight, l.Config.AntiDilution)).ToList(),
             Name = shareholder.Name,
             Document = shareholder.Document,
             DocumentFormatted = shareholder.DocumentFormatted,

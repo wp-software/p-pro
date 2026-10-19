@@ -9,6 +9,7 @@ public record ShareholderResponse
     public Guid ClientId { get; init; }
     public Guid CompanyId { get; init; }
     public string CompanyName { get; init; } = string.Empty;
+    public List<ShareholderCompanyDto> Companies { get; init; } = new();
     public string Name { get; init; } = string.Empty;
     public string Document { get; init; } = string.Empty;
     public string DocumentFormatted { get; init; } = string.Empty;
@@ -38,6 +39,31 @@ public record ShareholderResponse
     public DateTime UpdatedAt { get; init; }
 }
 
+public record ShareholderCompanyDto(
+    Guid Id,
+    string Name,
+    ShareholderType Type,
+    bool EarnOut,
+    bool TagAlong,
+    bool DragAlong,
+    bool ShareholdersAgreement,
+    bool RightOfFirstRefusal,
+    bool LiquidationPreferenceRight,
+    bool AntiDilution);
+
+public record ShareholderCompanyConfigRequest
+{
+    public Guid CompanyId { get; init; }
+    public ShareholderType Type { get; init; }
+    public bool EarnOut { get; init; }
+    public bool TagAlong { get; init; }
+    public bool DragAlong { get; init; }
+    public bool ShareholdersAgreement { get; init; }
+    public bool RightOfFirstRefusal { get; init; }
+    public bool LiquidationPreferenceRight { get; init; }
+    public bool AntiDilution { get; init; }
+}
+
 public class ShareholderListResponse : PagedResult<ShareholderResponse>
 {
     public ShareholderListResponse(IEnumerable<ShareholderResponse> items, int totalCount, int pageNumber, int pageSize)
@@ -49,6 +75,7 @@ public class ShareholderListResponse : PagedResult<ShareholderResponse>
 public record CreateShareholderRequest
 {
     public Guid CompanyId { get; init; }
+    public List<ShareholderCompanyConfigRequest>? Companies { get; init; }
     public string Name { get; init; } = string.Empty;
     public string Document { get; init; } = string.Empty;
     public DocumentType DocumentType { get; init; }
@@ -77,6 +104,7 @@ public record CreateShareholderRequest
 public record UpdateShareholderRequest
 {
     public Guid? CompanyId { get; init; }
+    public List<ShareholderCompanyConfigRequest>? Companies { get; init; }
     public string Name { get; init; } = string.Empty;
     public string? Email { get; init; }
     public string? Phone { get; init; }
