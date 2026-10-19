@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, ChevronLeft, ChevronRight, Lock } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, Lock, Settings2 } from 'lucide-react';
 import { Button, Card, Spinner, Badge } from '@/components/ui';
 import { useFinancialPeriods, useCreateFinancialPeriod } from '@/hooks';
 import { useClientStore } from '@/stores/clientStore';
@@ -65,9 +65,14 @@ export default function FinancialPage() {
           <h1 className="text-2xl font-bold text-gray-900">Financeiro</h1>
           <p className="text-sm text-gray-500 mt-1">Períodos mensais de dados financeiros</p>
         </div>
-        <Button icon={<Plus size={16} />} onClick={() => setShowNewForm(true)}>
-          Novo Período
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" icon={<Settings2 size={16} />} onClick={() => navigate('/financial/metrics')}>
+            Métricas
+          </Button>
+          <Button icon={<Plus size={16} />} onClick={() => setShowNewForm(true)}>
+            Novo Período
+          </Button>
+        </div>
       </div>
 
       {/* Year selector */}

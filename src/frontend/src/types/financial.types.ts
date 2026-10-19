@@ -153,3 +153,108 @@ export interface UpsertProfitabilityRequest {
   ebitda?: number;
   netIncome?: number;
 }
+
+// ─── Configurable metrics & dashboard ─────────────────────────────────────────
+
+export type MetricDataType = 'currency' | 'number' | 'integer' | 'percentage';
+export type DashboardWidgetType = 'kpi' | 'line' | 'bar' | 'area';
+export type WidgetScope = 'annual' | 'monthly';
+export type WidgetAggregation = 'last' | 'sum' | 'avg';
+
+export const widgetScopeLabels: Record<WidgetScope, string> = {
+  annual: 'Anual',
+  monthly: 'Por competência',
+};
+
+export const widgetAggregationLabels: Record<WidgetAggregation, string> = {
+  last: 'Último valor do ano',
+  sum: 'Soma do ano',
+  avg: 'Média do ano',
+};
+
+export const metricDataTypeLabels: Record<MetricDataType, string> = {
+  currency: 'Moeda (R$)',
+  number: 'Número',
+  integer: 'Número inteiro',
+  percentage: 'Percentual (%)',
+};
+
+export const widgetTypeLabels: Record<DashboardWidgetType, string> = {
+  kpi: 'Indicador (KPI)',
+  line: 'Linhas',
+  bar: 'Barras',
+  area: 'Área',
+};
+
+export interface FinancialMetricDefinition {
+  id: string;
+  companyId: string;
+  key: string;
+  label: string;
+  category: string;
+  dataType: MetricDataType;
+  unit: string | null;
+  description: string | null;
+  displayOrder: number;
+  isSystem: boolean;
+  isCalculated: boolean;
+  isActive: boolean;
+}
+
+export interface CreateMetricDefinitionRequest {
+  companyId: string;
+  key?: string;
+  label: string;
+  category?: string;
+  dataType: MetricDataType;
+  unit?: string;
+  description?: string;
+}
+
+export interface UpdateMetricDefinitionRequest {
+  label: string;
+  category?: string;
+  dataType?: MetricDataType;
+  unit?: string;
+  description?: string;
+  displayOrder?: number;
+  isActive?: boolean;
+}
+
+export type MetricValues = Record<string, number | null>;
+
+export interface PeriodMetricValues {
+  periodId: string;
+  values: MetricValues;
+}
+
+export interface MetricSeriesPoint {
+  periodId: string;
+  year: number;
+  month: number;
+  status: string;
+  values: MetricValues;
+}
+
+export interface FinancialMetricSeries {
+  companyId: string;
+  year: number;
+  points: MetricSeriesPoint[];
+}
+
+export interface DashboardWidget {
+  id?: string;
+  title: string;
+  widgetType: DashboardWidgetType;
+  metricKeys: string[];
+  size: 'small' | 'large';
+  scope: WidgetScope;
+  aggregation: WidgetAggregation;
+  displayOrder: number;
+}
+
+export interface FinancialDashboardConfig {
+  companyId: string;
+  definitions: FinancialMetricDefinition[];
+  widgets: DashboardWidget[];
+}

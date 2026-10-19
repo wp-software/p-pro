@@ -146,6 +146,7 @@ public static class InfrastructureServiceExtensions
         // Fase 5 - Financial Module - Repositories
         services.AddScoped<IFinancialPeriodRepository, FinancialPeriodRepository>();
         services.AddScoped<IFinancialMetricRepository, FinancialMetricRepository>();
+        services.AddScoped<IFinancialConfigRepository, FinancialConfigRepository>();
 
         // Fase 5 - Document Module - Repositories
         services.AddScoped<IDocumentRepository, DocumentRepository>();
@@ -160,6 +161,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IValuationCalculationEngine, ValuationCalculationEngine>();
         services.AddScoped<IValuationService, ValuationService>();
         services.AddScoped<IFinancialPeriodService, FinancialPeriodService>();
+        services.AddScoped<IFinancialMetricConfigService, FinancialMetricConfigService>();
         services.AddScoped<IDocumentService, DocumentService>();
         services.AddScoped<ICustomFormulaService, CustomFormulaService>();
 

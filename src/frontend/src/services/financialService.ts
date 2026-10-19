@@ -10,6 +10,14 @@ import type {
   UpsertUnitEconomicsRequest,
   UpsertProfitabilityRequest,
   FinancialDashboard,
+  FinancialMetricDefinition,
+  CreateMetricDefinitionRequest,
+  UpdateMetricDefinitionRequest,
+  PeriodMetricValues,
+  MetricValues,
+  FinancialMetricSeries,
+  FinancialDashboardConfig,
+  DashboardWidget,
 } from '@/types';
 
 interface ApiResponse<T> {
@@ -112,6 +120,61 @@ export const financialService = {
       `/financial/${id}/metrics/profitability`,
       data
     );
+    return response.data.data;
+  },
+
+  // ─── Configurable metrics ──────────────────────────────────
+
+  async listMetricDefinitions(companyId: string, includeInactive = false): Promise<FinancialMetricDefinition[]> {
+    const response = await api.get<ApiResponse<FinancialMetricDefinition[]>>('/financial/metric-definitions', {
+      params: { companyId, includeInactive },
+    });
+    return response.data.data;
+  },
+
+  async createMetricDefinition(data: CreateMetricDefinitionRequest): Promise<FinancialMetricDefinition> {
+    const response = await api.post<ApiResponse<FinancialMetricDefinition>>('/financial/metric-definitions', data);
+    return response.data.data;
+  },
+
+  async updateMetricDefinition(id: string, data: UpdateMetricDefinitionRequest): Promise<FinancialMetricDefinition> {
+    const response = await api.put<ApiResponse<FinancialMetricDefinition>>(`/financial/metric-definitions/${id}`, data);
+    return response.data.data;
+  },
+
+  async deleteMetricDefinition(id: string): Promise<void> {
+    await api.delete(`/financial/metric-definitions/${id}`);
+  },
+
+  async getPeriodValues(periodId: string): Promise<PeriodMetricValues> {
+    const response = await api.get<ApiResponse<PeriodMetricValues>>(`/financial/${periodId}/values`);
+    return response.data.data;
+  },
+
+  async savePeriodValues(periodId: string, values: MetricValues): Promise<PeriodMetricValues> {
+    const response = await api.put<ApiResponse<PeriodMetricValues>>(`/financial/${periodId}/values`, { values });
+    return response.data.data;
+  },
+
+  async getMetricSeries(companyId: string, year: number): Promise<FinancialMetricSeries> {
+    const response = await api.get<ApiResponse<FinancialMetricSeries>>('/financial/metric-series', {
+      params: { companyId, year },
+    });
+    return response.data.data;
+  },
+
+  async getDashboardConfig(companyId: string): Promise<FinancialDashboardConfig> {
+    const response = await api.get<ApiResponse<FinancialDashboardConfig>>('/financial/dashboard-config', {
+      params: { companyId },
+    });
+    return response.data.data;
+  },
+
+  async saveDashboardConfig(companyId: string, widgets: DashboardWidget[]): Promise<FinancialDashboardConfig> {
+    const response = await api.put<ApiResponse<FinancialDashboardConfig>>('/financial/dashboard-config', {
+      companyId,
+      widgets,
+    });
     return response.data.data;
   },
 };

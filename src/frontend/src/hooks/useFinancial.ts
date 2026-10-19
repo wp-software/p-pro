@@ -8,6 +8,10 @@ import type {
   UpsertCashBurnRequest,
   UpsertUnitEconomicsRequest,
   UpsertProfitabilityRequest,
+  CreateMetricDefinitionRequest,
+  UpdateMetricDefinitionRequest,
+  MetricValues,
+  DashboardWidget,
 } from '@/types';
 import toast from 'react-hot-toast';
 
@@ -197,3 +201,105 @@ export const useUpsertProfitability = makeMetricMutation<UpsertProfitabilityRequ
   ({ id, data }) => financialService.upsertProfitability(id, data),
   'Lucratividade atualizada'
 );
+
+// ─── Configurable metrics & dashboard ─────────────────────────────────────────
+
+function errorMessage(error: any, fallback: string): string {
+  return error.response?.data?.message || error.response?.data?.errors?.[0] || fallback;
+}
+
+export function useMetricDefinitions(companyId: string, includeInactive = false) {
+  return useQuery({
+    queryKey: [...QUERY_KEY, 'definitions', companyId, includeInactive],
+    queryFn: () => financialService.listMetricDefinitions(companyId, includeInactive),
+    enabled: !!companyId,
+  });
+}
+
+export function useCreateMetricDefinition() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateMetricDefinitionRequest) => financialService.createMetricDefinition(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      toast.success('Métrica criada');
+    },
+    onError: (error: any) => toast.error(errorMessage(error, 'Erro ao criar métrica')),
+  });
+}
+
+export function useUpdateMetricDefinition() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateMetricDefinitionRequest }) =>
+      financialService.updateMetricDefinition(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      toast.success('Métrica atualizada');
+    },
+    onError: (error: any) => toast.error(errorMessage(error, 'Erro ao atualizar métrica')),
+  });
+}
+
+export function useDeleteMetricDefinition() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => financialService.deleteMetricDefinition(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      toast.success('Métrica removida');
+    },
+    onError: (error: any) => toast.error(errorMessage(error, 'Erro ao remover métrica')),
+  });
+}
+
+export function usePeriodMetricValues(periodId: string) {
+  return useQuery({
+    queryKey: [...QUERY_KEY, 'values', periodId],
+    queryFn: () => financialService.getPeriodValues(periodId),
+    enabled: !!periodId,
+  });
+}
+
+export function useSavePeriodMetricValues() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, values }: { id: string; values: MetricValues }) =>
+      financialService.savePeriodValues(id, values),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      toast.success('Métricas salvas');
+    },
+    onError: (error: any) => toast.error(errorMessage(error, 'Erro ao salvar métricas')),
+  });
+}
+
+export function useFinancialMetricSeries(companyId: string, year: number) {
+  return useQuery({
+    queryKey: [...QUERY_KEY, 'series', companyId, year],
+    queryFn: () => financialService.getMetricSeries(companyId, year),
+    staleTime: 30000,
+    enabled: !!companyId && !!year,
+  });
+}
+
+export function useFinancialDashboardConfig(companyId: string) {
+  return useQuery({
+    queryKey: [...QUERY_KEY, 'dashboard-config', companyId],
+    queryFn: () => financialService.getDashboardConfig(companyId),
+    enabled: !!companyId,
+  });
+}
+
+export function useSaveFinancialDashboardConfig() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ companyId, widgets }: { companyId: string; widgets: DashboardWidget[] }) =>
+      financialService.saveDashboardConfig(companyId, widgets),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      toast.success('Dashboard salvo');
+    },
+    onError: (error: any) => toast.error(errorMessage(error, 'Erro ao salvar dashboard')),
+  });
+}

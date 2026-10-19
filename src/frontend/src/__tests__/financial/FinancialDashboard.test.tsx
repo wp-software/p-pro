@@ -3,152 +3,131 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import FinancialDashboardPage from '../../pages/financial/FinancialDashboardPage';
 
-// ─── Mocks ────────────────────────────────────────────────────────────────────
-
 vi.mock('../../hooks', () => ({
-  useFinancialDashboard: vi.fn(),
+  useFinancialMetricSeries: vi.fn(),
+  useFinancialDashboardConfig: vi.fn(),
+  useSaveFinancialDashboardConfig: vi.fn(),
 }));
 
 vi.mock('../../stores/clientStore', () => ({
   useClientStore: vi.fn(),
 }));
 
-import { useFinancialDashboard } from '../../hooks';
+import {
+  useFinancialMetricSeries,
+  useFinancialDashboardConfig,
+  useSaveFinancialDashboardConfig,
+} from '../../hooks';
 import { useClientStore } from '../../stores/clientStore';
 
-const mockDashboard = {
+const def = (key: string, label: string, dataType = 'currency') => ({
+  id: key,
   companyId: 'company-1',
-  year: 2026,
-  periods: [
-    {
-      id: 'period-1',
-      clientId: 'client-1',
-      companyId: 'company-1',
-      year: 2026,
-      month: 1,
-      periodLabel: 'Jan/2026',
-      status: 'approved',
-      notes: null,
-      submittedAt: '2026-01-31T10:00:00Z',
-      approvedAt: '2026-02-01T10:00:00Z',
-      lockedAt: null,
-      createdAt: '2026-01-01T10:00:00Z',
-      updatedAt: '2026-02-01T10:00:00Z',
-      metrics: {
-        id: 'metric-1',
-        periodId: 'period-1',
-        grossRevenue: 500000,
-        netRevenue: 450000,
-        mrr: 100000,
-        arr: 1200000,
-        cashBalance: 3000000,
-        burnRate: 150000,
-        runwayMonths: 20,
-        runwayStatus: 'green',
-        customerCount: 85,
-        churnRate: 2.5,
-        cac: 1200,
-        ltv: 24000,
-        ltvToCacRatio: 20,
-        nps: 72,
-        ebitda: -50000,
-        ebitdaMargin: -11.1,
-        netIncome: -60000,
-        createdAt: '2026-01-01T10:00:00Z',
-        updatedAt: '2026-02-01T10:00:00Z',
-      },
-    },
+  key,
+  label,
+  category: 'Geral',
+  dataType,
+  unit: null,
+  description: null,
+  displayOrder: 0,
+  isSystem: false,
+  isCalculated: false,
+  isActive: true,
+});
+
+const config = {
+  companyId: 'company-1',
+  definitions: [def('mrr', 'MRR'), def('tickets_per_day', 'Tickets por dia', 'integer')],
+  widgets: [
+    { id: 'w1', title: 'Receita Recorrente', widgetType: 'kpi', metricKeys: ['mrr'], size: 'small', scope: 'annual', aggregation: 'last', displayOrder: 0 },
+    { id: 'w2', title: 'Volume de Tickets', widgetType: 'kpi', metricKeys: ['tickets_per_day'], size: 'small', scope: 'monthly', aggregation: 'last', displayOrder: 10 },
+    { id: 'w3', title: 'Tickets acumulados', widgetType: 'kpi', metricKeys: ['tickets_per_day'], size: 'small', scope: 'annual', aggregation: 'sum', displayOrder: 20 },
   ],
-  trend: {
-    mrrGrowthPercent: 8.5,
-    arrCurrentMonth: 1200000,
-    avgBurnRate3Months: 145000,
-    runwayMonths: 20,
-    runwayStatus: 'green',
-    avgChurnRate3Months: 2.5,
-  },
 };
 
-describe('FinancialDashboardPage', () => {
+const series = {
+  companyId: 'company-1',
+  year: 2026,
+  points: [
+    { periodId: 'p1', year: 2026, month: 1, status: 'approved', values: { mrr: 100000, tickets_per_day: 40 } },
+    { periodId: 'p2', year: 2026, month: 2, status: 'approved', values: { mrr: 110000, tickets_per_day: 44 } },
+  ],
+};
+
+function mockHooks(overrides: { config?: unknown; series?: unknown; loading?: boolean } = {}) {
+  vi.mocked(useFinancialMetricSeries).mockReturnValue({
+    data: 'series' in overrides ? overrides.series : series,
+    isLoading: overrides.loading ?? false,
+  } as never);
+  vi.mocked(useFinancialDashboardConfig).mockReturnValue({
+    data: 'config' in overrides ? overrides.config : config,
+    isLoading: false,
+  } as never);
+  vi.mocked(useSaveFinancialDashboardConfig).mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+}
+
+describe('FinancialDashboardPage (configurable)', () => {
   beforeEach(() => {
-    vi.mocked(useClientStore).mockReturnValue({ selectedCompanyId: 'company-1' } as any);
+    vi.mocked(useClientStore).mockReturnValue({ selectedCompanyId: 'company-1' } as never);
   });
 
-  it('shows "selecione uma empresa" when no company is selected', () => {
-    vi.mocked(useClientStore).mockReturnValue({ selectedCompanyId: null } as any);
-    vi.mocked(useFinancialDashboard).mockReturnValue({ data: undefined, isLoading: false } as any);
-
+  it('asks to select a company when none is selected', () => {
+    vi.mocked(useClientStore).mockReturnValue({ selectedCompanyId: null } as never);
+    mockHooks();
     render(<MemoryRouter><FinancialDashboardPage /></MemoryRouter>);
     expect(screen.getByText(/Selecione uma empresa/i)).toBeInTheDocument();
   });
 
   it('shows spinner while loading', () => {
-    vi.mocked(useFinancialDashboard).mockReturnValue({ data: undefined, isLoading: true } as any);
-
+    mockHooks({ loading: true });
     render(<MemoryRouter><FinancialDashboardPage /></MemoryRouter>);
-    // Spinner renders <div class="spinner ...">
     expect(document.querySelector('.spinner')).toBeTruthy();
   });
 
-  it('renders dashboard title', () => {
-    vi.mocked(useFinancialDashboard).mockReturnValue({ data: mockDashboard, isLoading: false } as any);
-
+  it('annual view consolidates closed periods using the widget aggregation', () => {
+    mockHooks();
     render(<MemoryRouter><FinancialDashboardPage /></MemoryRouter>);
     expect(screen.getByText('Dashboard Financeiro')).toBeInTheDocument();
+    expect(screen.getByText('Receita Recorrente')).toBeInTheDocument();
+    expect(screen.getByText('Tickets acumulados')).toBeInTheDocument();
+    expect(screen.getByText('84')).toBeInTheDocument(); // 40 + 44
+    expect(screen.queryByText('Volume de Tickets')).not.toBeInTheDocument();
   });
 
-  it('renders all 4 KPI labels', () => {
-    vi.mocked(useFinancialDashboard).mockReturnValue({ data: mockDashboard, isLoading: false } as any);
-
+  it('competence view shows the selected month with MoM and the metrics table', () => {
+    mockHooks();
     render(<MemoryRouter><FinancialDashboardPage /></MemoryRouter>);
-    expect(screen.getByText('MRR Atual')).toBeInTheDocument();
-    expect(screen.getByText('ARR Projetado')).toBeInTheDocument();
-    expect(screen.getByText('Burn Rate')).toBeInTheDocument();
-    expect(screen.getByText('Runway')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Por competência' }));
+    expect(screen.getByText('Volume de Tickets')).toBeInTheDocument();
+    expect(screen.queryByText('Tickets acumulados')).not.toBeInTheDocument();
+    expect(screen.getByText('10.0% MoM')).toBeInTheDocument();
+    expect(screen.getByText('Todas as métricas da competência')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Competência'), { target: { value: '1' } });
+    expect(screen.queryByText('10.0% MoM')).not.toBeInTheDocument();
   });
 
-  it('shows runway gauge with green status', () => {
-    vi.mocked(useFinancialDashboard).mockReturnValue({ data: mockDashboard, isLoading: false } as any);
-
+  it('shows empty state when no widgets are configured', () => {
+    mockHooks({ config: { ...config, widgets: [] } });
     render(<MemoryRouter><FinancialDashboardPage /></MemoryRouter>);
-    expect(screen.getByText('Saudável (>12 meses)')).toBeInTheDocument();
+    expect(screen.getByText(/Nenhum widget anual configurado/i)).toBeInTheDocument();
   });
 
-  it('shows current year in chart headings', () => {
-    const currentYear = new Date().getFullYear();
-    vi.mocked(useFinancialDashboard).mockReturnValue({ data: mockDashboard, isLoading: false } as any);
-
+  it('enters configuration mode and allows adding a widget', () => {
+    mockHooks();
     render(<MemoryRouter><FinancialDashboardPage /></MemoryRouter>);
-    const yearHeadings = screen.getAllByText(new RegExp(String(currentYear)));
-    expect(yearHeadings.length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByText('Configurar'));
+    expect(screen.getAllByLabelText('Título do widget')).toHaveLength(3);
+    fireEvent.click(screen.getByText('Adicionar widget'));
+    expect(screen.getAllByLabelText('Título do widget')).toHaveLength(4);
+    expect(screen.getByText('Salvar')).toBeInTheDocument();
   });
 
   it('changes year when navigation buttons are clicked', () => {
     const currentYear = new Date().getFullYear();
-    vi.mocked(useFinancialDashboard).mockReturnValue({ data: mockDashboard, isLoading: false } as any);
-
+    mockHooks();
     render(<MemoryRouter><FinancialDashboardPage /></MemoryRouter>);
-    
-    // Current year shown
-    expect(screen.getByText(String(currentYear))).toBeInTheDocument();
-    
-    // Click previous year button
     fireEvent.click(screen.getByText('‹'));
     expect(screen.getByText(String(currentYear - 1))).toBeInTheDocument();
-    
-    // Click next year (back to current)
-    fireEvent.click(screen.getByText('›'));
-    expect(screen.getByText(String(currentYear))).toBeInTheDocument();
-  });
-
-  it('renders "Sem dados" message when no periods exist', () => {
-    vi.mocked(useFinancialDashboard).mockReturnValue({
-      data: { ...mockDashboard, periods: [], trend: null },
-      isLoading: false,
-    } as any);
-
-    render(<MemoryRouter><FinancialDashboardPage /></MemoryRouter>);
-    // Multiple chart empty state messages
-    expect(screen.getAllByText('Sem dados para o período.').length).toBeGreaterThanOrEqual(2);
   });
 });
