@@ -132,6 +132,7 @@ const navGroups: NavGroup[] = [
     icon: Layers,
     items: [
       { nameKey: 'nav.customFormulas', href: '/valuations/custom-formulas', icon: FlaskConical },
+      { nameKey: 'nav.shareClasses', href: '/share-classes', icon: PieChart },
       { nameKey: 'nav.clauses', href: '/contracts/clauses', icon: List, requiresRole: ['Admin', 'Legal'] },
       { nameKey: 'nav.milestoneTemplates', href: '/vesting/milestone-templates', icon: Layers, requiresRole: ['Admin'] },
     ],

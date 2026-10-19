@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { X, Plus, DollarSign, FileText } from 'lucide-react';
+import { X, Plus, DollarSign } from 'lucide-react';
 import { Button, Input, Card } from '@/components/ui';
 import { useIssueShares } from '@/hooks/useCapTable';
 import { useShareholders } from '@/hooks/useShareholders';
@@ -37,7 +37,7 @@ export default function IssueSharesModal({
   companyId,
   onSuccess,
 }: IssueSharesModalProps) {
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [activeTab, setActiveTab] = useState<'issue' | 'additional'>('issue');
 
   const { data: shareholdersData, isLoading: loadingShareholders } = useShareholders({ 
     companyId, 
@@ -91,6 +91,7 @@ export default function IssueSharesModal({
     issueShares.mutate(request, {
       onSuccess: () => {
         reset();
+        setActiveTab('issue');
         onClose();
         onSuccess?.();
       },
@@ -99,7 +100,20 @@ export default function IssueSharesModal({
 
   const handleClose = () => {
     reset();
+    setActiveTab('issue');
     onClose();
+  };
+
+  const handleInvalidSubmit = (formErrors: typeof errors) => {
+    if (
+      formErrors.shareholderId ||
+      formErrors.shareClassId ||
+      formErrors.quantity ||
+      formErrors.pricePerShare ||
+      formErrors.referenceDate
+    ) {
+      setActiveTab('issue');
+    }
   };
 
   if (!isOpen) return null;
@@ -129,155 +143,190 @@ export default function IssueSharesModal({
           </div>
 
           {/* Body */}
-          <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
-            {/* Sócio */}
-            <div>
-              <label className="input-label">Sócio *</label>
-              <select
-                {...register('shareholderId')}
-                className="input"
-                disabled={loadingShareholders}
-              >
-                <option value="">Selecione um sócio</option>
-                {shareholdersData?.items?.map((shareholder) => (
-                  <option key={shareholder.id} value={shareholder.id}>
-                    {shareholder.name}
-                  </option>
-                ))}
-              </select>
-              {errors.shareholderId && (
-                <p className="input-error-message">{errors.shareholderId.message}</p>
-              )}
-            </div>
+          <form
+            onSubmit={handleSubmit(onSubmit, handleInvalidSubmit)}
+            className="flex max-h-[calc(100vh-10rem)] flex-col"
+          >
+            <nav className="flex border-b px-6" role="tablist" aria-label="Seções da emissão de ações">
+              {([
+                { id: 'issue', label: 'Dados da emissão' },
+                { id: 'additional', label: 'Dados adicionais' },
+              ] as const).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  id={`issue-shares-tab-${tab.id}`}
+                  aria-controls={`issue-shares-panel-${tab.id}`}
+                  aria-selected={activeTab === tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`border-b-2 px-5 py-3 text-sm font-medium transition-colors ${
+                    activeTab === tab.id
+                      ? 'border-primary-600 text-primary-700'
+                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
 
-            {/* Classe de Ações */}
-            <div>
-              <label className="input-label">Classe de Ações *</label>
-              <select
-                {...register('shareClassId')}
-                className="input"
-                disabled={loadingClasses || !shareClassesData?.length}
-              >
-                <option value="">
-                  {loadingClasses
-                    ? 'Carregando...'
-                    : !shareClassesData?.length
-                    ? 'Nenhuma classe de ações cadastrada'
-                    : 'Selecione uma classe'}
-                </option>
-                {shareClassesData?.map((shareClass) => (
-                  <option key={shareClass.id} value={shareClass.id}>
-                    {shareClass.code} - {shareClass.name}
-                  </option>
-                ))}
-              </select>
-              {errors.shareClassId && (
-                <p className="input-error-message">{errors.shareClassId.message}</p>
-              )}
-              {!loadingClasses && !shareClassesData?.length && (
-                <p className="text-xs text-amber-600 mt-1">
-                  Cadastre as classes de ações da empresa antes de emitir.{' '}
-                  <a
-                    href="/share-classes"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-medium underline"
-                  >
-                    Criar classes de ações
-                  </a>
-                </p>
-              )}
-            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              {activeTab === 'issue' && (
+                <div
+                  className="space-y-4"
+                  role="tabpanel"
+                  id="issue-shares-panel-issue"
+                  aria-labelledby="issue-shares-tab-issue"
+                >
+                  {/* Sócio */}
+                  <div>
+                    <label className="input-label">Sócio *</label>
+                    <select
+                      {...register('shareholderId')}
+                      className="input"
+                      disabled={loadingShareholders}
+                    >
+                      <option value="">Selecione um sócio</option>
+                      {shareholdersData?.items?.map((shareholder) => (
+                        <option key={shareholder.id} value={shareholder.id}>
+                          {shareholder.name}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.shareholderId && (
+                      <p className="input-error-message">{errors.shareholderId.message}</p>
+                    )}
+                  </div>
 
-            {/* Quantidade e Preço */}
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Quantidade *"
-                type="number"
-                step="1"
-                min="1"
-                {...register('quantity')}
-                error={errors.quantity?.message}
-              />
-              <Input
-                label="Preço por Ação (R$) *"
-                type="number"
-                step="0.01"
-                min="0"
-                {...register('pricePerShare')}
-                error={errors.pricePerShare?.message}
-              />
-            </div>
+                  {/* Classe de Ações */}
+                  <div>
+                    <label className="input-label">Classe de Ações *</label>
+                    <select
+                      {...register('shareClassId')}
+                      className="input"
+                      disabled={loadingClasses || !shareClassesData?.length}
+                    >
+                      <option value="">
+                        {loadingClasses
+                          ? 'Carregando...'
+                          : !shareClassesData?.length
+                          ? 'Nenhuma classe de ações cadastrada'
+                          : 'Selecione uma classe'}
+                      </option>
+                      {shareClassesData?.map((shareClass) => (
+                        <option key={shareClass.id} value={shareClass.id}>
+                          {shareClass.code} - {shareClass.name}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.shareClassId && (
+                      <p className="input-error-message">{errors.shareClassId.message}</p>
+                    )}
+                    {!loadingClasses && !shareClassesData?.length && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        Cadastre as classes de ações da empresa antes de emitir.{' '}
+                        <a
+                          href="/share-classes"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium underline"
+                        >
+                          Criar classes de ações
+                        </a>
+                      </p>
+                    )}
+                  </div>
 
-            {/* Valor Total (calculado) */}
-            <Card className="p-4 bg-gray-50">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-gray-600">
-                  <DollarSign className="w-4 h-4" />
-                  <span className="text-sm">Valor Total</span>
-                </div>
-                <span className="text-lg font-semibold text-gray-900">
-                  {totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </span>
-              </div>
-            </Card>
+                  {/* Quantidade e Preço */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input
+                      label="Quantidade *"
+                      type="number"
+                      step="1"
+                      min="1"
+                      {...register('quantity')}
+                      error={errors.quantity?.message}
+                    />
+                    <Input
+                      label="Preço por Ação (R$) *"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      {...register('pricePerShare')}
+                      error={errors.pricePerShare?.message}
+                    />
+                  </div>
 
-            {/* Data de Referência */}
-            <Input
-              label="Data de Referência *"
-              type="date"
-              {...register('referenceDate')}
-              error={errors.referenceDate?.message}
-            />
+                  {/* Valor Total (calculado) */}
+                  <Card className="p-4 bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <DollarSign className="w-4 h-4" />
+                        <span className="text-sm">Valor Total</span>
+                      </div>
+                      <span className="text-lg font-semibold text-gray-900">
+                        {totalValue.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </span>
+                    </div>
+                  </Card>
 
-            {/* Toggle Campos Avançados */}
-            <button
-              type="button"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="flex items-center gap-2 text-sm text-primary hover:text-primary/80"
-            >
-              <FileText className="w-4 h-4" />
-              {showAdvanced ? 'Ocultar campos adicionais' : 'Mostrar campos adicionais'}
-            </button>
-
-            {/* Campos Avançados */}
-            {showAdvanced && (
-              <div className="space-y-4 pt-2 border-t border-gray-200">
-                <div className="grid grid-cols-2 gap-4">
+                  {/* Data de Referência */}
                   <Input
-                    label="Nº do Certificado"
-                    {...register('certificateNumber')}
-                    error={errors.certificateNumber?.message}
+                    label="Data de Referência *"
+                    type="date"
+                    {...register('referenceDate')}
+                    error={errors.referenceDate?.message}
+                  />
+                </div>
+              )}
+
+              {activeTab === 'additional' && (
+                <div
+                  className="space-y-4"
+                  role="tabpanel"
+                  id="issue-shares-panel-additional"
+                  aria-labelledby="issue-shares-tab-additional"
+                >
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input
+                      label="Nº do Certificado"
+                      {...register('certificateNumber')}
+                      error={errors.certificateNumber?.message}
+                    />
+                    <Input
+                      label="Nº da Transação"
+                      {...register('transactionNumber')}
+                      error={errors.transactionNumber?.message}
+                    />
+                  </div>
+                  <Input
+                    label="Motivo"
+                    {...register('reason')}
+                    error={errors.reason?.message}
                   />
                   <Input
-                    label="Nº da Transação"
-                    {...register('transactionNumber')}
-                    error={errors.transactionNumber?.message}
+                    label="Referência de Documento"
+                    {...register('documentReference')}
+                    error={errors.documentReference?.message}
                   />
+                  <div>
+                    <label className="input-label">Observações</label>
+                    <textarea
+                      {...register('notes')}
+                      className="input min-h-[80px]"
+                      placeholder="Observações adicionais..."
+                    />
+                  </div>
                 </div>
-                <Input
-                  label="Motivo"
-                  {...register('reason')}
-                  error={errors.reason?.message}
-                />
-                <Input
-                  label="Referência de Documento"
-                  {...register('documentReference')}
-                  error={errors.documentReference?.message}
-                />
-                <div>
-                  <label className="input-label">Observações</label>
-                  <textarea
-                    {...register('notes')}
-                    className="input min-h-[80px]"
-                    placeholder="Observações adicionais..."
-                  />
-                </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Actions */}
-            <div className="flex justify-end gap-3 pt-4 border-t">
+            <div className="flex justify-end gap-3 border-t px-6 py-4">
               <Button type="button" variant="secondary" onClick={handleClose}>
                 Cancelar
               </Button>

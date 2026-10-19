@@ -12,6 +12,7 @@ import ResetPassword from './pages/ResetPassword';
 import ActivateAccount from './pages/ActivateAccount';
 import Dashboard from './pages/Dashboard';
 import { CapTablePage, TransactionsPage } from './pages/captable';
+import ShareClassesPage from './pages/captable/ShareClassesPage';
 import Companies from './pages/Companies';
 import Users from './pages/settings/Users';
 import { Plans, ClientsSubscriptions, BillingDashboard, Invoices } from './pages/billing';
@@ -23,7 +24,7 @@ import ContractBuilderPage from './pages/contracts/builder';
 import ContractDetailsPage from './pages/contracts/[id]';
 import { VestingPage, VestingGrantDetailPage, MyVestingPage, VestingPlanDetailPage, VestingGrantsPage, GrantMilestonesPage, MilestoneTemplatesPage } from './pages/vesting';
 import { ValuationsPage, ValuationDetailPage, ValuationNewPage, ValuationDashboardPage } from './pages/valuation';
-import { FinancialPage, FinancialPeriodPage, FinancialDashboardPage } from './pages/financial';
+import { FinancialPage, FinancialPeriodPage, FinancialDashboardPage, FinancialMetricsPage } from './pages/financial';
 import DocumentsPage from './pages/documents/DocumentsPage';
 import CustomFormulasPage from './pages/custom-formulas/CustomFormulasPage';
 import CustomFormulaNewPage from './pages/custom-formulas/CustomFormulaNewPage';
@@ -63,6 +64,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/cap-table" element={<CapTablePage />} />
         <Route path="/cap-table/transactions" element={<TransactionsPage />} />
+        <Route path="/share-classes" element={<ShareClassesPage />} />
         <Route path="/companies" element={<Companies />} />
         <Route path="/partners" element={<Navigate to="/shareholders" replace />} />
 
@@ -97,6 +99,7 @@ function App() {
         {/* Financial Routes */}
         <Route path="/financial" element={<FinancialPage />} />
         <Route path="/financial/dashboard" element={<FinancialDashboardPage />} />
+        <Route path="/financial/metrics" element={<FinancialMetricsPage />} />
         <Route path="/financial/:year/:month" element={<FinancialPeriodPage />} />
 
         {/* Documents Routes */}
