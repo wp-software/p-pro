@@ -30,7 +30,8 @@ import {
 
 export default function TransactionsPage() {
   const navigate = useNavigate();
-  const { selectedCompanyId } = useClientStore();
+  const { selectedCompanyId: rawCompanyId } = useClientStore();
+  const selectedCompanyId = rawCompanyId === '__all__' ? null : rawCompanyId;
 
   // Modals
   const [showIssueModal, setShowIssueModal] = useState(false);

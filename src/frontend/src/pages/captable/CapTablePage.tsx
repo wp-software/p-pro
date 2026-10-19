@@ -10,7 +10,8 @@ type ChartView = 'type' | 'class';
 
 export default function CapTablePage() {
   const navigate = useNavigate();
-  const { selectedCompanyId } = useClientStore();
+  const { selectedCompanyId: rawCompanyId } = useClientStore();
+  const selectedCompanyId = rawCompanyId === '__all__' ? null : rawCompanyId;
   const [chartView, setChartView] = useState<ChartView>('type');
   const [asOfDate, setAsOfDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [showSimulator, setShowSimulator] = useState(false);
@@ -32,7 +33,7 @@ export default function CapTablePage() {
         <Card className="p-8 text-center">
           <PieChart className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <h2 className="text-lg font-semibold text-gray-900 mb-2">Nenhuma empresa selecionada</h2>
-          <p className="text-gray-500">Selecione uma empresa para visualizar o Cap Table.</p>
+          <p className="text-gray-500">Selecione uma empresa específica (não "Todas as empresas") para visualizar o Cap Table.</p>
         </Card>
       </div>
     );
