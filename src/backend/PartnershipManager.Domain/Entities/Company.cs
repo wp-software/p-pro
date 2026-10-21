@@ -99,6 +99,12 @@ public class Company : BaseEntity
         SharePrice = sharePrice;
         UpdatedAt = DateTime.UtcNow;
     }
+
+    public void UpdateCurrency(string currency)
+    {
+        Currency = currency.ToUpperInvariant();
+        UpdatedAt = DateTime.UtcNow;
+    }
     
     public void Activate()
     {

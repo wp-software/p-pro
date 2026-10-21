@@ -57,6 +57,9 @@ public record UpdateCompanyRequest
     public string Name { get; init; } = string.Empty;
     public string? TradingName { get; init; }
     public string? LogoUrl { get; init; }
+    public decimal? TotalShares { get; init; }
+    public decimal? SharePrice { get; init; }
+    public string? Currency { get; init; }
     
     // Address fields
     public string? Cep { get; init; }

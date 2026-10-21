@@ -131,6 +131,16 @@ public class CompaniesController : ControllerBase
         
         company.UpdateBasicInfo(request.Name, request.TradingName, request.LogoUrl);
         company.UpdateAddress(request.Cep, request.Street, request.Number, request.Complement, request.Neighborhood, request.City, request.State);
+        if (request.TotalShares.HasValue || request.SharePrice.HasValue)
+        {
+            company.UpdateShareInfo(
+                request.TotalShares ?? company.TotalShares,
+                request.SharePrice ?? company.SharePrice);
+        }
+        if (request.Currency is not null)
+        {
+            company.UpdateCurrency(request.Currency);
+        }
         await _unitOfWork.Companies.UpdateAsync(company);
         
         // Invalidar cache

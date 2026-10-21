@@ -68,6 +68,9 @@ export interface UpdateCompanyRequest {
   name: string;
   tradingName?: string;
   logoUrl?: string;
+  totalShares?: number;
+  sharePrice?: number;
+  currency?: string;
   
   // Address fields
   cep?: string;

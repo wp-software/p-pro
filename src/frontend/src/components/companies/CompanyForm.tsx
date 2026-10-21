@@ -55,6 +55,44 @@ type CreateFormData = z.infer<typeof createCompanySchema>;
 type UpdateFormData = z.infer<typeof updateCompanySchema>;
 type FormData = CreateFormData | UpdateFormData;
 
+function parseLocalizedNumber(value: string): number {
+  const normalized = value.replace(/[^\d,.-]/g, '');
+  if (!normalized) return Number.NaN;
+
+  const commaIndex = normalized.lastIndexOf(',');
+  const dotIndex = normalized.lastIndexOf('.');
+  if (commaIndex >= 0) {
+    return Number(normalized.replace(/\./g, '').replace(',', '.'));
+  }
+  if (dotIndex >= 0) {
+    const decimalDigits = normalized.length - dotIndex - 1;
+    return Number(decimalDigits === 3 ? normalized.replace(/\./g, '') : normalized);
+  }
+  return Number(normalized);
+}
+
+function formatCurrencyInput(value: number, currency: string): string {
+  if (!Number.isFinite(value)) return '';
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function formatNumberInput(value: number): string {
+  if (!Number.isFinite(value)) return '';
+  return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(value);
+}
+
+function formatUngroupedNumber(value: number): string {
+  return new Intl.NumberFormat('pt-BR', {
+    useGrouping: false,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 interface ViaCepResponse {
   cep: string;
   logradouro: string;
@@ -75,6 +113,10 @@ export function CompanyForm({ company, onClose }: CompanyFormProps) {
   const createCompany = useCreateCompany();
   const updateCompany = useUpdateCompany();
   const [isSearchingCep, setIsSearchingCep] = useState(false);
+  const [isEditingSharePrice, setIsEditingSharePrice] = useState(false);
+  const [sharePriceInput, setSharePriceInput] = useState('');
+  const [isEditingTotalShares, setIsEditingTotalShares] = useState(false);
+  const [totalSharesInput, setTotalSharesInput] = useState('');
 
   const getLegalFormValue = (legalFormString: string): number => {
     const entry = Object.entries(LegalFormLabels).find(
@@ -96,6 +138,7 @@ export function CompanyForm({ company, onClose }: CompanyFormProps) {
     handleSubmit,
     setValue,
     watch,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(isEditing ? updateCompanySchema : createCompanySchema),
@@ -137,6 +180,11 @@ export function CompanyForm({ company, onClose }: CompanyFormProps) {
   });
 
   const cepValue = watch('cep');
+  const currencyValue = watch('currency') || 'BRL';
+  const sharePriceValue = watch('sharePrice');
+  const totalSharesValue = watch('totalShares');
+  const sharePriceField = register('sharePrice');
+  const totalSharesField = register('totalShares');
 
   const searchCep = async () => {
     const cep = cepValue?.replace(/\D/g, '');
@@ -179,6 +227,9 @@ export function CompanyForm({ company, onClose }: CompanyFormProps) {
             name: data.name,
             tradingName: data.tradingName,
             logoUrl: (data as UpdateFormData).logoUrl,
+            totalShares: data.totalShares,
+            sharePrice: data.sharePrice,
+            currency: data.currency,
             cep: data.cep,
             street: data.street,
             number: data.number,
@@ -286,17 +337,56 @@ export function CompanyForm({ company, onClose }: CompanyFormProps) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Input
                 label="Total de Ações"
-                type="number"
-                {...register('totalShares')}
+                type="text"
+                inputMode="decimal"
+                {...totalSharesField}
+                value={
+                  isEditingTotalShares
+                    ? totalSharesInput
+                    : formatNumberInput(Number(totalSharesValue))
+                }
+                onFocus={() => {
+                  setIsEditingTotalShares(true);
+                  setTotalSharesInput(formatUngroupedNumber(Number(getValues('totalShares'))));
+                }}
+                onChange={(event) => {
+                  setTotalSharesInput(event.target.value);
+                  setValue('totalShares', parseLocalizedNumber(event.target.value), {
+                    shouldValidate: true,
+                  });
+                }}
+                onBlur={(event) => {
+                  totalSharesField.onBlur(event);
+                  setIsEditingTotalShares(false);
+                }}
                 error={(errors as any).totalShares?.message}
                 placeholder="1000000"
               />
 
               <Input
                 label="Preço por Ação"
-                type="number"
-                step="0.01"
-                {...register('sharePrice')}
+                type="text"
+                inputMode="decimal"
+                {...sharePriceField}
+                value={
+                  isEditingSharePrice
+                    ? sharePriceInput
+                    : formatCurrencyInput(Number(sharePriceValue), currencyValue)
+                }
+                onFocus={() => {
+                  setIsEditingSharePrice(true);
+                  setSharePriceInput(formatUngroupedNumber(Number(getValues('sharePrice'))));
+                }}
+                onChange={(event) => {
+                  setSharePriceInput(event.target.value);
+                  setValue('sharePrice', parseLocalizedNumber(event.target.value), {
+                    shouldValidate: true,
+                  });
+                }}
+                onBlur={(event) => {
+                  sharePriceField.onBlur(event);
+                  setIsEditingSharePrice(false);
+                }}
                 error={(errors as any).sharePrice?.message}
                 placeholder="1.00"
               />

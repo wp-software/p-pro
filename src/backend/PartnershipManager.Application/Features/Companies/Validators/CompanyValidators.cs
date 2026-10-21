@@ -115,6 +115,21 @@ public class UpdateCompanyValidator : AbstractValidator<UpdateCompanyRequest>
                 .WithMessage(string.Format(ErrorMessages.MaxLength, "URL do Logo", SystemConstants.MaxUrlLength))
             .Must(BeValidUrl).WithMessage(ErrorMessages.InvalidUrl)
             .When(x => !string.IsNullOrEmpty(x.LogoUrl));
+
+        RuleFor(x => x.TotalShares)
+            .GreaterThan(0).WithMessage(ErrorMessages.InvalidTotalShares)
+            .When(x => x.TotalShares.HasValue);
+
+        RuleFor(x => x.SharePrice)
+            .GreaterThan(0).WithMessage(ErrorMessages.InvalidSharePrice)
+            .When(x => x.SharePrice.HasValue);
+
+        RuleFor(x => x.Currency)
+            .NotEmpty().WithMessage(string.Format(ErrorMessages.Required, "Moeda"))
+            .Length(3).WithMessage("Moeda deve ter 3 caracteres (ex: BRL, USD)")
+            .Must(currency => new[] { "BRL", "USD", "EUR", "GBP" }.Contains(currency?.ToUpperInvariant()))
+            .WithMessage(ErrorMessages.InvalidCurrency)
+            .When(x => x.Currency is not null);
     }
     
     private static bool BeValidUrl(string? url)
