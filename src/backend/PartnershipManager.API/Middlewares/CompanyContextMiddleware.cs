@@ -51,7 +51,13 @@ public class CompanyContextMiddleware
                 }
                 
                 // Validar se a company pertence ao mesmo client do usuário
-                if (clientId.HasValue && company.ClientId != clientId.Value)
+                var isSuperAdmin = user.IsInRole("SuperAdmin");
+                if (isSuperAdmin)
+                {
+                    // SuperAdmin acessa qualquer tenant: assume o client da empresa selecionada
+                    context.Items["ClientId"] = company.ClientId;
+                }
+                else if (clientId.HasValue && company.ClientId != clientId.Value)
                 {
                     _logger.LogWarning(
                         "Usuário tentou acessar company de outro client. UserId: {UserId}, CompanyId: {CompanyId}, CompanyClientId: {CompanyClientId}, UserClientId: {UserClientId}",

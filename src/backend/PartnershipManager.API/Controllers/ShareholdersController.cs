@@ -38,13 +38,14 @@ public class ShareholdersController : ControllerBase
         [FromQuery] int pageSize = 10,
         [FromQuery] string? search = null,
         [FromQuery] string? type = null,
-        [FromQuery] string? status = null)
+        [FromQuery] string? status = null,
+        [FromQuery] string? sortDirection = null)
     {
         pageSize = Math.Min(pageSize, SystemConstants.MaxPageSize);
 
         var clientId = HttpContext.GetRequiredClientId();
 
-        var result = await _shareholderService.GetPagedAsync(clientId, companyId, page, pageSize, search, type, status);
+        var result = await _shareholderService.GetPagedAsync(clientId, companyId, page, pageSize, search, type, status, sortDirection);
 
         return Ok(ApiResponse<ShareholderListResponse>.Ok(result));
     }

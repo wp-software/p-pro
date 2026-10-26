@@ -164,6 +164,23 @@ export interface IssueSharesRequest {
   notes?: string;
 }
 
+export interface IssueSharesBatchRequest {
+  companyId: string;
+  shareClassId: string;
+  totalQuantity: number;
+  pricePerShare: number;
+  referenceDate: string;
+  allocations: ShareAllocation[];
+  reason?: string;
+  documentReference?: string;
+  notes?: string;
+}
+
+export interface ShareAllocation {
+  shareholderId: string;
+  quantity: number;
+}
+
 export interface TransferSharesRequest {
   companyId: string;
   fromShareholderId: string;

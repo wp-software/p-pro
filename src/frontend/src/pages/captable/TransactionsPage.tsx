@@ -14,11 +14,13 @@ import {
   XCircle,
   Repeat,
   ArrowLeft,
+  Layers,
 } from 'lucide-react';
 import { Button, Card } from '@/components/ui';
 import { useTransactions } from '@/hooks/useCapTable';
 import { useClientStore } from '@/stores/clientStore';
 import IssueSharesModal from '@/components/captable/IssueSharesModal';
+import IssueSharesBatchModal from '@/components/captable/IssueSharesBatchModal';
 import TransferSharesModal from '@/components/captable/TransferSharesModal';
 import CancelSharesModal from '@/components/captable/CancelSharesModal';
 import {
@@ -35,6 +37,7 @@ export default function TransactionsPage() {
 
   // Modals
   const [showIssueModal, setShowIssueModal] = useState(false);
+  const [showIssueBatchModal, setShowIssueBatchModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
 
@@ -183,6 +186,14 @@ export default function TransactionsPage() {
             icon={<Plus className="w-4 h-4" />}
           >
             Emitir
+          </Button>
+
+          <Button
+            variant="success"
+            onClick={() => setShowIssueBatchModal(true)}
+            icon={<Layers className="w-4 h-4" />}
+          >
+            Emissão em Lote
           </Button>
 
           <Button
@@ -513,6 +524,13 @@ export default function TransactionsPage() {
       <IssueSharesModal
         isOpen={showIssueModal}
         onClose={() => setShowIssueModal(false)}
+        companyId={selectedCompanyId}
+        onSuccess={() => refetch()}
+      />
+
+      <IssueSharesBatchModal
+        isOpen={showIssueBatchModal}
+        onClose={() => setShowIssueBatchModal(false)}
         companyId={selectedCompanyId}
         onSuccess={() => refetch()}
       />

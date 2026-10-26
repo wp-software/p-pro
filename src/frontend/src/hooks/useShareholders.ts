@@ -1,13 +1,13 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { shareholderService } from '@/services/shareholderService';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { shareholderService } from "@/services/shareholderService";
 import type {
   ShareholderFilters,
   CreateShareholderRequest,
   UpdateShareholderRequest,
-} from '@/types';
-import toast from 'react-hot-toast';
+} from "@/types";
+import toast from "react-hot-toast";
 
-const QUERY_KEY = ['shareholders'];
+const QUERY_KEY = ["shareholders"];
 
 /**
  * Hook para listar sócios com paginação e filtros
@@ -17,6 +17,19 @@ export function useShareholders(filters?: ShareholderFilters) {
     queryKey: [...QUERY_KEY, filters],
     queryFn: () => shareholderService.getShareholders(filters),
     staleTime: 30000, // 30 segundos
+  });
+}
+
+/**
+ * Hook para listar todos os sócios de uma empresa, sem limite de paginação
+ */
+export function useAllShareholders(companyId: string | undefined) {
+  return useQuery({
+    queryKey: [...QUERY_KEY, "all", companyId],
+    queryFn: () => shareholderService.getAllByCompany(companyId!),
+    enabled: !!companyId,
+    staleTime: 30000,
+    refetchOnMount: "always",
   });
 }
 
@@ -36,7 +49,7 @@ export function useShareholder(id: string) {
  */
 export function useShareholderByDocument(document: string) {
   return useQuery({
-    queryKey: [...QUERY_KEY, 'document', document],
+    queryKey: [...QUERY_KEY, "document", document],
     queryFn: () => shareholderService.getShareholderByDocument(document),
     enabled: !!document && document.length >= 11, // CPF ou CNPJ
   });
@@ -53,13 +66,13 @@ export function useCreateShareholder() {
       shareholderService.createShareholder(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-      toast.success('Sócio criado com sucesso');
+      toast.success("Sócio criado com sucesso");
     },
     onError: (error: any) => {
       const message =
         error.response?.data?.message ||
         error.response?.data?.errors?.[0]?.message ||
-        'Erro ao criar sócio';
+        "Erro ao criar sócio";
       toast.error(message);
     },
   });
@@ -72,18 +85,23 @@ export function useUpdateShareholder() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateShareholderRequest }) =>
-      shareholderService.updateShareholder(id, data),
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: UpdateShareholderRequest;
+    }) => shareholderService.updateShareholder(id, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEY, variables.id] });
-      toast.success('Sócio atualizado com sucesso');
+      toast.success("Sócio atualizado com sucesso");
     },
     onError: (error: any) => {
       const message =
         error.response?.data?.message ||
         error.response?.data?.errors?.[0]?.message ||
-        'Erro ao atualizar sócio';
+        "Erro ao atualizar sócio";
       toast.error(message);
     },
   });
@@ -99,11 +117,10 @@ export function useDeleteShareholder() {
     mutationFn: (id: string) => shareholderService.deleteShareholder(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-      toast.success('Sócio excluído com sucesso');
+      toast.success("Sócio excluído com sucesso");
     },
     onError: (error: any) => {
-      const message =
-        error.response?.data?.message || 'Erro ao excluir sócio';
+      const message = error.response?.data?.message || "Erro ao excluir sócio";
       toast.error(message);
     },
   });
@@ -119,10 +136,10 @@ export function useActivateShareholder() {
     mutationFn: (id: string) => shareholderService.activateShareholder(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-      toast.success('Sócio ativado com sucesso');
+      toast.success("Sócio ativado com sucesso");
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Erro ao ativar sócio');
+      toast.error(error.response?.data?.message || "Erro ao ativar sócio");
     },
   });
 }
@@ -137,10 +154,10 @@ export function useDeactivateShareholder() {
     mutationFn: (id: string) => shareholderService.deactivateShareholder(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-      toast.success('Sócio desativado com sucesso');
+      toast.success("Sócio desativado com sucesso");
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Erro ao desativar sócio');
+      toast.error(error.response?.data?.message || "Erro ao desativar sócio");
     },
   });
 }

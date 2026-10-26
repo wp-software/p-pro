@@ -129,6 +129,25 @@ public record IssueSharesRequest
     public string? Notes { get; init; }
 }
 
+public record IssueSharesBatchRequest
+{
+    public Guid CompanyId { get; init; }
+    public Guid ShareClassId { get; init; }
+    public decimal TotalQuantity { get; init; }
+    public decimal PricePerShare { get; init; }
+    public DateTime ReferenceDate { get; init; }
+    public List<ShareAllocationRequest> Allocations { get; init; } = [];
+    public string? Reason { get; init; }
+    public string? DocumentReference { get; init; }
+    public string? Notes { get; init; }
+}
+
+public record ShareAllocationRequest
+{
+    public Guid ShareholderId { get; init; }
+    public decimal Quantity { get; init; }
+}
+
 public record TransferSharesRequest
 {
     public Guid CompanyId { get; init; }

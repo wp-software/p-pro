@@ -3,6 +3,7 @@ using PartnershipManager.Domain.Entities;
 using PartnershipManager.Domain.Enums;
 using PartnershipManager.Domain.Exceptions;
 using PartnershipManager.Domain.Interfaces;
+using PartnershipManager.Infrastructure.Persistence;
 
 namespace PartnershipManager.Infrastructure.Services;
 
@@ -23,6 +24,7 @@ public interface IShareService
     
     // Operations
     Task<ShareResponse> IssueSharesAsync(Guid clientId, IssueSharesRequest request, Guid? userId = null);
+    Task<IReadOnlyList<ShareResponse>> IssueSharesBatchAsync(Guid clientId, IssueSharesBatchRequest request, Guid? userId = null);
     Task<ShareResponse> TransferSharesAsync(Guid clientId, TransferSharesRequest request, Guid? userId = null);
     Task CancelSharesAsync(Guid clientId, CancelSharesRequest request, Guid? userId = null);
     
@@ -38,19 +40,22 @@ public class ShareService : IShareService
     private readonly IShareClassRepository _shareClassRepository;
     private readonly IShareholderRepository _shareholderRepository;
     private readonly ICompanyRepository _companyRepository;
+    private readonly DapperContext _dapperContext;
 
     public ShareService(
         IShareRepository shareRepository,
         IShareTransactionRepository transactionRepository,
         IShareClassRepository shareClassRepository,
         IShareholderRepository shareholderRepository,
-        ICompanyRepository companyRepository)
+        ICompanyRepository companyRepository,
+        DapperContext dapperContext)
     {
         _shareRepository = shareRepository;
         _transactionRepository = transactionRepository;
         _shareClassRepository = shareClassRepository;
         _shareholderRepository = shareholderRepository;
         _companyRepository = companyRepository;
+        _dapperContext = dapperContext;
     }
 
     #region Shares
@@ -202,6 +207,61 @@ public class ShareService : IShareService
         // Reload share with navigation properties
         var createdShare = await _shareRepository.GetByIdAsync(share.Id, clientId);
         return MapToShareResponse(createdShare!);
+    }
+
+    public async Task<IReadOnlyList<ShareResponse>> IssueSharesBatchAsync(
+        Guid clientId,
+        IssueSharesBatchRequest request,
+        Guid? userId = null)
+    {
+        if (request.TotalQuantity <= 0)
+            throw new BusinessException("A quantidade total da emissão deve ser maior que zero");
+
+        if (request.PricePerShare < 0)
+            throw new BusinessException("O preço por ação não pode ser negativo");
+
+        if (request.Allocations is null || request.Allocations.Count == 0)
+            throw new BusinessException("Informe a distribuição das ações entre os sócios");
+
+        if (request.Allocations.Any(allocation => allocation.Quantity <= 0))
+            throw new BusinessException("A quantidade distribuída para cada sócio deve ser maior que zero");
+
+        if (request.Allocations.Select(allocation => allocation.ShareholderId).Distinct().Count() != request.Allocations.Count)
+            throw new BusinessException("Cada sócio deve aparecer apenas uma vez na distribuição");
+
+        if (request.Allocations.Sum(allocation => allocation.Quantity) != request.TotalQuantity)
+            throw new BusinessException("A soma das ações distribuídas deve ser igual ao total da emissão");
+
+        await _dapperContext.BeginTransactionAsync();
+        try
+        {
+            var shares = new List<ShareResponse>(request.Allocations.Count);
+            foreach (var allocation in request.Allocations)
+            {
+                var share = await IssueSharesAsync(clientId, new IssueSharesRequest
+                {
+                    CompanyId = request.CompanyId,
+                    ShareholderId = allocation.ShareholderId,
+                    ShareClassId = request.ShareClassId,
+                    Quantity = allocation.Quantity,
+                    PricePerShare = request.PricePerShare,
+                    ReferenceDate = request.ReferenceDate,
+                    Reason = request.Reason,
+                    DocumentReference = request.DocumentReference,
+                    Notes = request.Notes
+                }, userId);
+
+                shares.Add(share);
+            }
+
+            await _dapperContext.CommitTransactionAsync();
+            return shares;
+        }
+        catch
+        {
+            await _dapperContext.RollbackTransactionAsync();
+            throw;
+        }
     }
 
     public async Task<ShareResponse> TransferSharesAsync(Guid clientId, TransferSharesRequest request, Guid? userId = null)

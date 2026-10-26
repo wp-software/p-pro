@@ -26,7 +26,8 @@ public class ShareholderRepository : IShareholderRepository
         int pageSize,
         string? search = null,
         string? type = null,
-        string? status = null)
+        string? status = null,
+        string? sortDirection = null)
     {
         var baseQuery = new StringBuilder(@"FROM shareholders sh
                     JOIN companies c ON c.id = sh.company_id
@@ -38,7 +39,7 @@ public class ShareholderRepository : IShareholderRepository
 
         if (companyId.HasValue)
         {
-            baseQuery.Append(" AND EXISTS (SELECT 1 FROM shareholder_companies sc WHERE sc.shareholder_id = sh.id AND sc.company_id = @CompanyId)");
+            baseQuery.Append(" AND (sh.company_id = @CompanyId OR EXISTS (SELECT 1 FROM shareholder_companies sc WHERE sc.shareholder_id = sh.id AND sc.company_id = @CompanyId))");
             parameters.Add("CompanyId", companyId.Value.ToString());
         }
 
@@ -63,7 +64,14 @@ public class ShareholderRepository : IShareholderRepository
         var countSql = $"SELECT COUNT(1) {baseQuery}";
         var total = await Connection.ExecuteScalarAsync<int>(countSql, parameters, Transaction);
 
-        baseQuery.Append(" ORDER BY sh.created_at DESC LIMIT @Offset, @PageSize");
+        // Whitelist: o valor nunca é interpolado diretamente no SQL
+        var orderBy = sortDirection?.ToLowerInvariant() switch
+        {
+            "asc" => "sh.name ASC, sh.id ASC",
+            "desc" => "sh.name DESC, sh.id DESC",
+            _ => "sh.created_at DESC"
+        };
+        baseQuery.Append($" ORDER BY {orderBy} LIMIT @Offset, @PageSize");
         parameters.Add("Offset", (page - 1) * pageSize);
         parameters.Add("PageSize", pageSize);
 

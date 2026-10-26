@@ -49,10 +49,41 @@ export const shareholderService = {
     if (filters?.type !== undefined) params.type = ShareholderType[filters.type];
     if (filters?.status !== undefined) params.status = ShareholderStatus[filters.status];
     if (filters?.companyId) params.companyId = filters.companyId;
-    
+    if (filters?.sortDirection) params.sortDirection = filters.sortDirection;
+
     const response = await api.get<ApiResponse<ShareholderListResponse>>('/shareholders', { params });
     const list = response.data.data;
     return { ...list, items: list.items.map(normalizeShareholder) };
+  },
+
+  /**
+   * Listar todos os sócios que atendem aos filtros, percorrendo as páginas da API
+   */
+  async getAllFiltered(filters: Omit<ShareholderFilters, 'page' | 'pageSize'>): Promise<Shareholder[]> {
+    const firstPage = await this.getShareholders({ ...filters, page: 1, pageSize: 100 });
+    const shareholders = [...firstPage.items];
+
+    for (let page = 2; page <= firstPage.totalPages; page += 1) {
+      const result = await this.getShareholders({ ...filters, page, pageSize: 100 });
+      shareholders.push(...result.items);
+    }
+
+    return shareholders;
+  },
+
+  /**
+   * Listar todos os sócios de uma empresa, percorrendo as páginas da API
+   */
+  async getAllByCompany(companyId: string): Promise<Shareholder[]> {
+    const firstPage = await this.getShareholders({ companyId, page: 1, pageSize: 100 });
+    const shareholders = [...firstPage.items];
+
+    for (let page = 2; page <= firstPage.totalPages; page += 1) {
+      const result = await this.getShareholders({ companyId, page, pageSize: 100 });
+      shareholders.push(...result.items);
+    }
+
+    return shareholders;
   },
 
   /**

@@ -73,7 +73,8 @@ public interface IShareholderRepository
         int pageSize,
         string? search = null,
         string? type = null,
-        string? status = null);
+        string? status = null,
+        string? sortDirection = null);
 
     Task<Shareholder?> GetByIdAsync(Guid id, Guid clientId);
     Task<Shareholder?> GetByDocumentAsync(Guid clientId, string document);

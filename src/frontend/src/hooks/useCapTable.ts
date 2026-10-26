@@ -1,10 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { capTableService } from '@/services/capTableService';
 import { shareService } from '@/services/shareService';
+import { AxiosError } from 'axios';
 import type {
   ShareFilters,
   TransactionFilters,
   IssueSharesRequest,
+  IssueSharesBatchRequest,
   TransferSharesRequest,
   CancelSharesRequest,
 } from '@/types';
@@ -167,6 +169,30 @@ export function useIssueShares() {
         error.response?.data?.errors?.[0] ||
         'Erro ao emitir ações';
       toast.error(message);
+    },
+  });
+}
+
+/**
+ * Hook para emitir ações para vários sócios em uma operação atômica
+ */
+export function useIssueSharesBatch() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: IssueSharesBatchRequest) => shareService.issueSharesBatch(data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: SHARES_KEY });
+      queryClient.invalidateQueries({ queryKey: TRANSACTIONS_KEY });
+      queryClient.invalidateQueries({ queryKey: [...CAP_TABLE_KEY, variables.companyId] });
+      toast.success('Emissão em lote realizada com sucesso');
+    },
+    onError: (error: unknown) => {
+      const responseData =
+        error instanceof AxiosError
+          ? (error.response?.data as { message?: string; errors?: string[] } | undefined)
+          : undefined;
+      toast.error(responseData?.message || responseData?.errors?.[0] || 'Erro ao emitir ações em lote');
     },
   });
 }

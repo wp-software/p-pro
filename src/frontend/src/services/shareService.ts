@@ -5,6 +5,7 @@ import type {
   ShareTransaction,
   TransactionListResponse,
   IssueSharesRequest,
+  IssueSharesBatchRequest,
   TransferSharesRequest,
   CancelSharesRequest,
   ShareFilters,
@@ -115,6 +116,14 @@ export const shareService = {
    */
   async issueShares(data: IssueSharesRequest): Promise<Share> {
     const response = await api.post<ApiResponse<Share>>('/shares/issue', data);
+    return response.data.data;
+  },
+
+  /**
+   * Emitir ações para vários sócios em uma única operação
+   */
+  async issueSharesBatch(data: IssueSharesBatchRequest): Promise<Share[]> {
+    const response = await api.post<ApiResponse<Share[]>>('/shares/issue-batch', data);
     return response.data.data;
   },
 

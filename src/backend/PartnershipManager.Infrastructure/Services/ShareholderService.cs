@@ -9,7 +9,7 @@ namespace PartnershipManager.Infrastructure.Services;
 
 public interface IShareholderService
 {
-    Task<ShareholderListResponse> GetPagedAsync(Guid clientId, Guid? companyId, int page, int pageSize, string? search, string? type, string? status);
+    Task<ShareholderListResponse> GetPagedAsync(Guid clientId, Guid? companyId, int page, int pageSize, string? search, string? type, string? status, string? sortDirection = null);
     Task<ShareholderResponse> GetByIdAsync(Guid id, Guid clientId);
     Task<ShareholderResponse> CreateAsync(Guid clientId, CreateShareholderRequest request, Guid? userId = null);
     Task<ShareholderResponse> UpdateAsync(Guid id, Guid clientId, UpdateShareholderRequest request, Guid? userId = null);
@@ -29,9 +29,9 @@ public class ShareholderService : IShareholderService
         _companyRepository = companyRepository;
     }
 
-    public async Task<ShareholderListResponse> GetPagedAsync(Guid clientId, Guid? companyId, int page, int pageSize, string? search, string? type, string? status)
+    public async Task<ShareholderListResponse> GetPagedAsync(Guid clientId, Guid? companyId, int page, int pageSize, string? search, string? type, string? status, string? sortDirection = null)
     {
-        var (items, total) = await _shareholderRepository.GetPagedAsync(clientId, companyId, page, pageSize, search, type, status);
+        var (items, total) = await _shareholderRepository.GetPagedAsync(clientId, companyId, page, pageSize, search, type, status, sortDirection);
         var itemList = items.ToList();
         var links = await _shareholderRepository.GetCompanyLinksAsync(itemList.Select(i => i.Id));
         var responseItems = itemList.Select(i => MapToResponse(i, links.GetValueOrDefault(i.Id)));

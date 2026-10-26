@@ -162,6 +162,7 @@ export interface ShareholderFilters {
   type?: ShareholderType;
   status?: ShareholderStatus;
   companyId?: string;
+  sortDirection?: 'asc' | 'desc';
 }
 
 // Helper functions for labels

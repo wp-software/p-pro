@@ -1,10 +1,12 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Upload, Users, Search, ChevronLeft, ChevronRight, LayoutGrid, List } from 'lucide-react';
+import { Plus, Upload, Users, Search, ChevronLeft, ChevronRight, LayoutGrid, List, Download } from 'lucide-react';
 import { Button, Card, Spinner, StatCard } from '@/components/ui';
 import { ShareholderCard, ShareholderList, ShareholderFilters, ShareholderFormModal, ImportShareholdersModal } from '@/components/shareholders';
 import { useShareholders, useDeleteShareholder } from '@/hooks/useShareholders';
+import { exportShareholdersToCsv } from '@/utils/exportShareholders';
+import { shareholderService } from '@/services/shareholderService';
 import { useAuthStore } from '@/stores/authStore';
 import { useConfirm } from '@/components/ui';
 import {
@@ -26,6 +28,7 @@ export default function ShareholdersListPage() {
   };
   const isAdmin = useAuthStore((s) => s.user?.roles?.includes('Admin') ?? false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -35,6 +38,7 @@ export default function ShareholdersListPage() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<ShareholderType | null>(null);
   const [statusFilter, setStatusFilter] = useState<ShareholderStatus | null>(null);
+  const [sortDirection, setSortDirection] = useState<'' | 'asc' | 'desc'>('');
   const [page, setPage] = useState(1);
   const pageSize = 12;
 
@@ -46,8 +50,9 @@ export default function ShareholdersListPage() {
       search: search || undefined,
       type: typeFilter ?? undefined,
       status: statusFilter ?? undefined,
+      sortDirection: sortDirection || undefined,
     }),
-    [page, search, typeFilter, statusFilter]
+    [page, search, typeFilter, statusFilter, sortDirection]
   );
 
   // Query
@@ -76,6 +81,24 @@ export default function ShareholdersListPage() {
     setTypeFilter(null);
     setStatusFilter(null);
     setPage(1);
+  };
+
+  // Exporta todos os sócios que atendem aos filtros/ordenação atuais, não só a página visível
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const all = await shareholderService.getAllFiltered({
+        search: filters.search,
+        type: filters.type,
+        status: filters.status,
+        sortDirection: filters.sortDirection,
+      });
+      exportShareholdersToCsv(all);
+    } catch {
+      alert('Não foi possível exportar os sócios. Tente novamente.');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleView = (shareholder: Shareholder) => {
@@ -180,7 +203,30 @@ export default function ShareholdersListPage() {
         onClearFilters={handleClearFilters}
       />
 
-      <div className="flex justify-end">
+      <div className="flex justify-end items-center gap-3">
+        {viewMode === 'list' && (
+          <Button
+            variant="secondary"
+            icon={<Download className="w-5 h-5" />}
+            onClick={handleExport}
+            disabled={!data?.items?.length || isExporting}
+          >
+            {isExporting ? 'Exportando...' : 'Exportar'}
+          </Button>
+        )}
+        <select
+          aria-label="Ordenar sócios"
+          value={sortDirection}
+          onChange={(e) => {
+            setSortDirection(e.target.value as '' | 'asc' | 'desc');
+            setPage(1);
+          }}
+          className="rounded-lg border border-primary-200 bg-white px-3 py-2 text-sm text-primary-700"
+        >
+          <option value="">Mais recentes</option>
+          <option value="asc">Nome (A–Z)</option>
+          <option value="desc">Nome (Z–A)</option>
+        </select>
         <div className="inline-flex rounded-lg border border-primary-200 overflow-hidden">
           <button
             type="button"

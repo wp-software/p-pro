@@ -167,6 +167,27 @@ public class SharesController : ControllerBase
     }
 
     /// <summary>
+    /// Emite ações para vários sócios em uma única operação
+    /// </summary>
+    [HttpPost("issue-batch")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ShareResponse>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> IssueSharesBatch([FromBody] IssueSharesBatchRequest request)
+    {
+        var clientId = HttpContext.GetRequiredClientId();
+        var userId = GetUserId();
+
+        var shares = await _shareService.IssueSharesBatchAsync(clientId, request, userId);
+        _logger.LogInformation(
+            "Emissão em lote de {Quantity} ações para {ShareholderCount} sócios",
+            request.TotalQuantity,
+            shares.Count);
+
+        return Ok(ApiResponse<IReadOnlyList<ShareResponse>>.Ok(shares, "Emissão em lote realizada com sucesso"));
+    }
+
+    /// <summary>
     /// Transfere ações entre sócios
     /// </summary>
     [HttpPost("transfer")]
