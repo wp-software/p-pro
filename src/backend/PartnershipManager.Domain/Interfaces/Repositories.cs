@@ -765,6 +765,17 @@ public interface IDataRoomRepository
     Task<IEnumerable<Document>> GetDocumentsInFolderAsync(Guid folderId);
     Task AddDocumentToFolderAsync(Guid folderId, Guid documentId, Guid addedBy);
     Task RemoveDocumentFromFolderAsync(Guid folderId, Guid documentId);
+    Task<IEnumerable<DataRoomFolder>> GetAllFoldersAsync(Guid dataRoomId);
+    Task<IEnumerable<DataRoomFolderRole>> GetFolderRolesByDataRoomAsync(Guid dataRoomId);
+    Task<bool> FinancialPeriodExistsAsync(Guid periodId, Guid clientId, Guid companyId);
+    Task AddFinancialMetricDocumentAsync(FinancialMetricDocument link);
+    Task<IEnumerable<FinancialMetricDocument>> GetFinancialMetricDocumentsAsync(Guid periodId);
+    Task<FinancialMetricDocument?> GetFinancialMetricDocumentAsync(Guid documentId);
+    Task DeleteFinancialMetricDocumentAsync(Guid documentId);
+    Task SetFolderRolesAsync(Guid folderId, IEnumerable<string> roles, Guid grantedBy);
+    Task<string?> GetDocumentNameAsync(Guid documentId);
+    Task AddActivityLogAsync(DataRoomActivityLog log);
+    Task<IEnumerable<DataRoomActivityLog>> GetActivityLogsAsync(Guid dataRoomId, Guid? folderId, int limit);
 }
 
 /// <summary>

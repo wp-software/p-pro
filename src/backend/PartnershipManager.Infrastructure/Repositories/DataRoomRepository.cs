@@ -133,4 +133,102 @@ public class DataRoomRepository : IDataRoomRepository
         var sql = "DELETE FROM data_room_folder_documents WHERE folder_id = @FolderId AND document_id = @DocumentId";
         await _context.Connection.ExecuteAsync(sql, new { FolderId = folderId, DocumentId = documentId });
     }
+
+    public async Task<IEnumerable<DataRoomFolder>> GetAllFoldersAsync(Guid dataRoomId)
+    {
+        var sql = @"SELECT id AS Id, data_room_id AS DataRoomId, parent_id AS ParentId, name AS Name,
+                           description AS Description, display_order AS DisplayOrder, visibility AS Visibility,
+                           created_by AS CreatedBy, created_at AS CreatedAt, updated_at AS UpdatedAt
+                    FROM data_room_folders WHERE data_room_id = @DataRoomId AND deleted_at IS NULL ORDER BY display_order";
+        return await _context.Connection.QueryAsync<DataRoomFolder>(sql, new { DataRoomId = dataRoomId });
+    }
+
+    public async Task<bool> FinancialPeriodExistsAsync(Guid periodId, Guid clientId, Guid companyId)
+        => await _context.Connection.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM financial_periods WHERE id = @PeriodId AND client_id = @ClientId AND company_id = @CompanyId",
+            new { PeriodId = periodId, ClientId = clientId, CompanyId = companyId }) > 0;
+
+    public async Task AddFinancialMetricDocumentAsync(FinancialMetricDocument link)
+    {
+        var sql = @"INSERT INTO financial_metric_documents (id, period_id, metric_key, document_id, folder_id, created_by, created_at)
+                    VALUES (@Id, @PeriodId, @MetricKey, @DocumentId, @FolderId, @CreatedBy, @CreatedAt)";
+        await _context.Connection.ExecuteAsync(sql, link);
+    }
+
+    private const string FinancialDocSelect = @"
+        SELECT l.id AS Id, l.period_id AS PeriodId, l.metric_key AS MetricKey, l.document_id AS DocumentId,
+               l.folder_id AS FolderId, d.name AS DocumentName, d.file_name AS FileName,
+               d.file_size_bytes AS FileSizeBytes, d.document_type AS DocumentType,
+               l.created_by AS CreatedBy, l.created_at AS CreatedAt
+        FROM financial_metric_documents l
+        INNER JOIN documents d ON d.id = l.document_id AND d.deleted_at IS NULL";
+
+    public async Task<IEnumerable<FinancialMetricDocument>> GetFinancialMetricDocumentsAsync(Guid periodId)
+        => await _context.Connection.QueryAsync<FinancialMetricDocument>(
+            FinancialDocSelect + " WHERE l.period_id = @PeriodId ORDER BY l.created_at DESC", new { PeriodId = periodId });
+
+    public async Task<FinancialMetricDocument?> GetFinancialMetricDocumentAsync(Guid documentId)
+        => await _context.Connection.QueryFirstOrDefaultAsync<FinancialMetricDocument>(
+            FinancialDocSelect + " WHERE l.document_id = @DocumentId", new { DocumentId = documentId });
+
+    public async Task DeleteFinancialMetricDocumentAsync(Guid documentId)
+        => await _context.Connection.ExecuteAsync(
+            "DELETE FROM financial_metric_documents WHERE document_id = @DocumentId", new { DocumentId = documentId });
+
+    public async Task<IEnumerable<DataRoomFolderRole>> GetFolderRolesByDataRoomAsync(Guid dataRoomId)
+    {
+        var sql = @"SELECT fr.folder_id AS FolderId, fr.role AS Role
+                    FROM data_room_folder_roles fr
+                    INNER JOIN data_room_folders f ON f.id = fr.folder_id
+                    WHERE f.data_room_id = @DataRoomId AND f.deleted_at IS NULL";
+        return await _context.Connection.QueryAsync<DataRoomFolderRole>(sql, new { DataRoomId = dataRoomId });
+    }
+
+    public async Task SetFolderRolesAsync(Guid folderId, IEnumerable<string> roles, Guid grantedBy)
+    {
+        using var tx = await _context.BeginTransactionAsync();
+        try
+        {
+            await _context.Connection.ExecuteAsync(
+                "DELETE FROM data_room_folder_roles WHERE folder_id = @FolderId", new { FolderId = folderId }, tx);
+
+            var rows = roles.Distinct().Select(r => new { FolderId = folderId, Role = r, GrantedBy = grantedBy }).ToList();
+            if (rows.Count > 0)
+            {
+                await _context.Connection.ExecuteAsync(
+                    "INSERT INTO data_room_folder_roles (folder_id, role, granted_by) VALUES (@FolderId, @Role, @GrantedBy)",
+                    rows, tx);
+            }
+            _context.CommitTransaction();
+        }
+        catch
+        {
+            _context.RollbackTransaction();
+            throw;
+        }
+    }
+
+    public async Task<string?> GetDocumentNameAsync(Guid documentId)
+        => await _context.Connection.ExecuteScalarAsync<string?>(
+            "SELECT name FROM documents WHERE id = @Id", new { Id = documentId });
+
+    public async Task AddActivityLogAsync(DataRoomActivityLog log)
+    {
+        var sql = @"INSERT INTO data_room_activity_logs
+                    (id, data_room_id, folder_id, folder_name, document_id, document_name, action, user_id, user_name, details, created_at)
+                    VALUES (@Id, @DataRoomId, @FolderId, @FolderName, @DocumentId, @DocumentName, @Action, @UserId, @UserName, @Details, @CreatedAt)";
+        await _context.Connection.ExecuteAsync(sql, log);
+    }
+
+    public async Task<IEnumerable<DataRoomActivityLog>> GetActivityLogsAsync(Guid dataRoomId, Guid? folderId, int limit)
+    {
+        var sql = @"SELECT id AS Id, data_room_id AS DataRoomId, folder_id AS FolderId, folder_name AS FolderName,
+                           document_id AS DocumentId, document_name AS DocumentName, action AS Action,
+                           user_id AS UserId, user_name AS UserName, details AS Details, created_at AS CreatedAt
+                    FROM data_room_activity_logs
+                    WHERE data_room_id = @DataRoomId AND (@FolderId IS NULL OR folder_id = @FolderId)
+                    ORDER BY created_at DESC LIMIT @Limit";
+        return await _context.Connection.QueryAsync<DataRoomActivityLog>(sql,
+            new { DataRoomId = dataRoomId, FolderId = folderId, Limit = limit });
+    }
 }

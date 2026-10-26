@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FolderOpen, Folder, Plus, Trash2, FileText, Link, Unlink } from 'lucide-react';
+import { FolderOpen, Folder, Plus, Trash2, FileText, Link, Unlink, Shield, History } from 'lucide-react';
 import { Button, Card, Spinner } from '@/components/ui';
 import {
   useDataRoomFolders,
@@ -8,11 +8,86 @@ import {
   useDeleteFolder,
   useAddDocumentToFolder,
   useRemoveDocumentFromFolder,
+  useSetFolderRoles,
+  useDataRoomActivityLogs,
 } from '@/hooks/useDataRoom';
 import type { DataRoomFolder } from '@/types/phase6';
 import { useConfirm } from '@/components/ui';
 import { cn } from '@/utils/cn';
 import { sanitizeUrl } from '@/utils/sanitizeHtml';
+import { dataRoomService } from '@/services/dataRoomService';
+import { useAuthStore } from '@/stores/authStore';
+
+const ROLE_OPTIONS = [
+  'Admin', 'Founder', 'BoardMember', 'Legal', 'Finance', 'HR', 'Employee', 'Investor', 'Viewer',
+];
+
+const ACTION_LABELS: Record<string, string> = {
+  DocumentAdded: 'Documento adicionado',
+  DocumentRemoved: 'Documento excluído',
+  FolderCreated: 'Pasta criada',
+  FolderDeleted: 'Pasta excluída',
+  PermissionsChanged: 'Permissões alteradas',
+};
+
+function FolderRolesPanel({ folder, onClose }: { folder: DataRoomFolder; onClose: () => void }) {
+  const [roles, setRoles] = useState<string[]>(folder.allowedRoles ?? []);
+  const setFolderRoles = useSetFolderRoles();
+
+  const toggle = (role: string) =>
+    setRoles((prev) => (prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]));
+
+  return (
+    <div className="mb-4 p-3 bg-primary-50 rounded-lg space-y-3">
+      <p className="text-xs text-primary-500">
+        Selecione os perfis com acesso a esta pasta (e subpastas). Sem nenhum perfil selecionado, todos os perfis têm
+        acesso. Administradores sempre têm acesso.
+      </p>
+      <div className="flex flex-wrap gap-3">
+        {ROLE_OPTIONS.map((role) => (
+          <label key={role} className="flex items-center gap-1.5 text-sm text-primary-700">
+            <input type="checkbox" checked={roles.includes(role)} onChange={() => toggle(role)} />
+            {role}
+          </label>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          loading={setFolderRoles.isPending}
+          onClick={() => setFolderRoles.mutate({ folderId: folder.id, roles }, { onSuccess: onClose })}
+        >
+          Salvar
+        </Button>
+        <Button size="sm" variant="secondary" onClick={onClose}>Cancelar</Button>
+      </div>
+    </div>
+  );
+}
+
+function ActivityLogPanel() {
+  const { data: logs = [], isLoading } = useDataRoomActivityLogs(true);
+  if (isLoading) return <div className="flex justify-center py-8"><Spinner /></div>;
+  if (logs.length === 0) {
+    return <p className="text-sm text-primary-400 text-center py-8">Nenhuma atividade registrada</p>;
+  }
+  return (
+    <div className="space-y-2">
+      {logs.map((log) => (
+        <div key={log.id} className="p-3 rounded-lg border border-primary-100 text-sm">
+          <div className="flex justify-between gap-2">
+            <span className="font-medium text-primary">{ACTION_LABELS[log.action] ?? log.action}</span>
+            <span className="text-xs text-primary-400">{new Date(log.createdAt).toLocaleString('pt-BR')}</span>
+          </div>
+          <p className="text-xs text-primary-500">
+            {log.documentName ? `${log.documentName} · ` : ''}Pasta: {log.folderName ?? '-'} · Por: {log.userName ?? log.userId}
+            {log.details ? ` · ${log.details}` : ''}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 interface NewFolderFormProps {
   onSubmit: (name: string) => void;
@@ -114,11 +189,16 @@ function AddDocumentForm({ folderId, onClose }: AddDocumentFormProps) {
 
 export default function DataRoomPage() {
   const { confirm } = useConfirm();
-  const [selectedFolder, setSelectedFolder] = useState<DataRoomFolder | null>(null);
+  const [selectedFolderState, setSelectedFolder] = useState<DataRoomFolder | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [showAddDoc, setShowAddDoc] = useState(false);
+  const [showRoles, setShowRoles] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
+  const isAdmin = useAuthStore((s) =>
+    s.user?.roles?.some((r) => r === 'Admin' || r === 'SuperAdmin') ?? false);
 
   const { data: folders = [], isLoading: foldersLoading } = useDataRoomFolders();
+  const selectedFolder = folders.find((f) => f.id === selectedFolderState?.id) ?? selectedFolderState;
   const { data: documents = [], isLoading: docsLoading } = useDocumentsInFolder(selectedFolder?.id ?? '');
   const createFolder = useCreateFolder();
   const deleteFolder = useDeleteFolder();
@@ -155,6 +235,15 @@ export default function DataRoomPage() {
       <div>
         <h1 className="page-title">Data Room</h1>
         <p className="page-subtitle">Organize e compartilhe documentos com investidores</p>
+        {isAdmin && (
+          <button
+            onClick={() => setShowLogs((v) => !v)}
+            className="mt-2 flex items-center gap-1.5 text-xs text-accent hover:text-accent/80 font-medium"
+          >
+            <History className="w-3.5 h-3.5" />
+            {showLogs ? 'Ocultar log de atividades' : 'Log de atividades'}
+          </button>
+        )}
       </div>
 
       <div className="flex gap-4 h-[600px]">
@@ -185,7 +274,7 @@ export default function DataRoomPage() {
                   key={folder.id}
                   folder={folder}
                   selected={selectedFolder?.id === folder.id}
-                  onSelect={setSelectedFolder}
+                  onSelect={(f) => { setSelectedFolder(f); setShowRoles(false); setShowLogs(false); }}
                   onDelete={handleDeleteFolder}
                 />
               ))
@@ -210,18 +299,31 @@ export default function DataRoomPage() {
               {selectedFolder ? selectedFolder.name : 'Selecione uma pasta'}
             </span>
             {selectedFolder && (
-              <button
-                onClick={() => setShowAddDoc(true)}
-                className="flex items-center gap-1.5 text-xs text-accent hover:text-accent/80 font-medium transition-colors"
-              >
-                <Link className="w-3.5 h-3.5" />
-                Adicionar documento
-              </button>
+              <div className="flex items-center gap-4">
+                {isAdmin && (
+                  <button
+                    onClick={() => setShowRoles((v) => !v)}
+                    className="flex items-center gap-1.5 text-xs text-accent hover:text-accent/80 font-medium transition-colors"
+                  >
+                    <Shield className="w-3.5 h-3.5" />
+                    Acesso por perfil
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowAddDoc(true)}
+                  className="flex items-center gap-1.5 text-xs text-accent hover:text-accent/80 font-medium transition-colors"
+                >
+                  <Link className="w-3.5 h-3.5" />
+                  Adicionar documento
+                </button>
+              </div>
             )}
           </div>
 
           <div className="flex-1 overflow-y-auto p-4">
-            {!selectedFolder ? (
+            {showLogs && isAdmin ? (
+              <ActivityLogPanel />
+            ) : !selectedFolder ? (
               <div className="flex flex-col items-center justify-center h-full text-primary-400 gap-2">
                 <FolderOpen className="w-12 h-12 opacity-30" />
                 <p className="text-sm">Selecione uma pasta para ver os documentos</p>
@@ -230,6 +332,9 @@ export default function DataRoomPage() {
               <div className="flex justify-center py-8"><Spinner /></div>
             ) : (
               <>
+                {showRoles && isAdmin && (
+                  <FolderRolesPanel key={selectedFolder.id} folder={selectedFolder} onClose={() => setShowRoles(false)} />
+                )}
                 {showAddDoc && (
                   <div className="mb-4">
                     <AddDocumentForm folderId={selectedFolder.id} onClose={() => setShowAddDoc(false)} />
@@ -252,6 +357,14 @@ export default function DataRoomPage() {
                           <p className="text-sm font-medium text-primary truncate">{doc.name}</p>
                           <p className="text-xs text-primary-400">{doc.documentType}</p>
                         </div>
+                        {(doc as { hasStoredFile?: boolean }).hasStoredFile && (
+                          <button
+                            className="text-xs text-accent hover:underline shrink-0"
+                            onClick={() => dataRoomService.downloadDocument(selectedFolder.id, doc.id, doc.fileName ?? doc.name)}
+                          >
+                            Download
+                          </button>
+                        )}
                         {sanitizeUrl(doc.downloadUrl) && (
                           <a
                             href={sanitizeUrl(doc.downloadUrl) ?? undefined}

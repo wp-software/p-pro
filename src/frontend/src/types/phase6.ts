@@ -139,7 +139,32 @@ export interface DataRoomFolder {
   displayOrder: number;
   visibility: 'internal' | 'investors' | 'public';
   createdAt: string;
+  allowedRoles?: string[];
   subFolders?: DataRoomFolder[];
+}
+
+export interface DataRoomActivityLog {
+  id: string;
+  folderId?: string;
+  folderName?: string;
+  documentId?: string;
+  documentName?: string;
+  action: string;
+  userId: string;
+  userName?: string;
+  details?: string;
+  createdAt: string;
+}
+
+export interface FinancialDocument {
+  documentId: string;
+  folderId: string;
+  metricKey?: string | null;
+  name: string;
+  fileName: string;
+  fileSizeBytes: number;
+  documentType: string;
+  createdAt: string;
 }
 
 export interface DataRoom {

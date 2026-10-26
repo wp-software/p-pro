@@ -90,3 +90,65 @@ export function useRemoveDocumentFromFolder() {
     },
   });
 }
+
+export function useSetFolderRoles() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ folderId, roles }: { folderId: string; roles: string[] }) =>
+      dataRoomService.setFolderRoles(folderId, roles),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      toast.success('Permissões da pasta atualizadas');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Erro ao atualizar permissões');
+    },
+  });
+}
+
+export function useDataRoomActivityLogs(enabled: boolean) {
+  return useQuery({
+    queryKey: [...QUERY_KEY, 'activity-logs'],
+    queryFn: () => dataRoomService.getActivityLogs(),
+    enabled,
+    staleTime: 10000,
+  });
+}
+
+export function useUploadFinancialDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (params: Parameters<typeof dataRoomService.uploadFinancialDocument>[0]) =>
+      dataRoomService.uploadFinancialDocument(params),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      toast.success(`Documento enviado para o Data Room (${result.folderPath})`);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Erro ao enviar documento ao Data Room');
+    },
+  });
+}
+
+export function useFinancialDocuments(periodId: string) {
+  return useQuery({
+    queryKey: [...QUERY_KEY, 'financial-docs', periodId],
+    queryFn: () => dataRoomService.getFinancialDocuments(periodId),
+    enabled: !!periodId,
+    staleTime: 15000,
+  });
+}
+
+export function useRemoveFinancialDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (documentId: string) => dataRoomService.removeFinancialDocument(documentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      toast.success('Documento removido');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Erro ao remover documento');
+    },
+  });
+}
