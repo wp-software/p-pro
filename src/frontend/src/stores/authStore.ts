@@ -32,6 +32,13 @@ type PersistedAuthState = Pick<
   'user' | 'accessToken' | 'refreshToken' | 'isAuthenticated'
 >;
 
+const REMEMBER_KEY = 'pm-remember-me';
+
+export const setRememberMe = (remember: boolean) => {
+  if (remember) localStorage.setItem(REMEMBER_KEY, 'true');
+  else localStorage.removeItem(REMEMBER_KEY);
+};
+
 export const useAuthStore = create<AuthState>()(
   persist<AuthState, [], [], PersistedAuthState>(
     (set) => ({
@@ -70,11 +77,20 @@ export const useAuthStore = create<AuthState>()(
       name: 'pm-auth-storage',
       storage: {
         getItem: (key) => {
-          const value = sessionStorage.getItem(key);
+          const value = localStorage.getItem(key) ?? sessionStorage.getItem(key);
           return value ? JSON.parse(value) : null;
         },
-        setItem: (key, value) => sessionStorage.setItem(key, JSON.stringify(value)),
-        removeItem: (key) => sessionStorage.removeItem(key),
+        setItem: (key, value) => {
+          const remember = localStorage.getItem(REMEMBER_KEY) === 'true';
+          const target = remember ? localStorage : sessionStorage;
+          const other = remember ? sessionStorage : localStorage;
+          other.removeItem(key);
+          target.setItem(key, JSON.stringify(value));
+        },
+        removeItem: (key) => {
+          localStorage.removeItem(key);
+          sessionStorage.removeItem(key);
+        },
       },
       partialize: (state) => ({
         user: state.user,

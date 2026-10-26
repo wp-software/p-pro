@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button, Input } from '@/components/ui';
-import { useAuthStore } from '@/stores/authStore';
+import { useAuthStore, setRememberMe } from '@/stores/authStore';
 import { authService } from '@/services/authService';
 import toast from 'react-hot-toast';
 
@@ -22,6 +22,7 @@ export default function Login() {
       z.object({
         email: z.string().email(t('auth.emailInvalid')).min(1, t('auth.emailRequired')),
         password: z.string().min(1, t('auth.passwordRequired')),
+        rememberMe: z.boolean().optional(),
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [i18n.language, t]
@@ -46,6 +47,7 @@ export default function Login() {
         password: data.password,
       });
 
+      setRememberMe(data.rememberMe === true);
       setAuth(
         response.user,
         response.accessToken,
@@ -116,6 +118,7 @@ export default function Login() {
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
+              {...register('rememberMe')}
               className="w-4 h-4 rounded border-primary-300 text-accent focus:ring-accent"
             />
             <span className="text-sm text-primary-600">{t('auth.rememberMe')}</span>
