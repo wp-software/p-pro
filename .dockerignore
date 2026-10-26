@@ -1,10 +1,39 @@
+# Git and local development configuration
 .git
+.claude
+.devcontainer
+.github
+.vscode
+**/.git
+**/.vs
+**/.idea
+
+# Environment files and local secrets
 .env
 .env.*
 **/.env
 **/.env.*
+
+# Dependencies and generated build artifacts
 **/node_modules
 **/dist
 **/bin
 **/obj
 **/logs
+**/TestResults
+**/coverage
+**/.cache
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/pnpm-debug.log*
+**/*.tsbuildinfo
+
+# Files not used by the root-context Docker builds
+/docker
+/prints
+/scripts
+/test_email.py
+/*.md
+/docker-compose*.yml
+/apply_*.sql

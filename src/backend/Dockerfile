@@ -18,15 +18,13 @@ RUN dotnet restore "PartnershipManager.API/PartnershipManager.API.csproj"
 # Copiar código fonte
 COPY src/backend/ .
 
-# Build
-WORKDIR "/src/PartnershipManager.API"
-RUN dotnet build "PartnershipManager.API.csproj" -c Release -o /app/build
-
-# Stage 2: Publish
+# Publish
 FROM build AS publish
-RUN dotnet publish "PartnershipManager.API.csproj" -c Release -o /app/publish /p:UseAppHost=false
+WORKDIR "/src/PartnershipManager.API"
+RUN dotnet publish "PartnershipManager.API.csproj" -c Release -o /app/publish \
+    --no-restore /p:UseAppHost=false
 
-# Stage 3: Runtime
+# Runtime
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
 

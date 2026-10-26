@@ -2,9 +2,15 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS backend-build
 WORKDIR /src/backend
 
+COPY ["src/backend/PartnershipManager.API/PartnershipManager.API.csproj", "PartnershipManager.API/"]
+COPY ["src/backend/PartnershipManager.Application/PartnershipManager.Application.csproj", "PartnershipManager.Application/"]
+COPY ["src/backend/PartnershipManager.Infrastructure/PartnershipManager.Infrastructure.csproj", "PartnershipManager.Infrastructure/"]
+COPY ["src/backend/PartnershipManager.Domain/PartnershipManager.Domain.csproj", "PartnershipManager.Domain/"]
+RUN dotnet restore PartnershipManager.API/PartnershipManager.API.csproj
+
 COPY src/backend/ ./
-RUN dotnet restore
-RUN dotnet publish -c Release -o /app/backend
+RUN dotnet publish PartnershipManager.API/PartnershipManager.API.csproj \
+    -c Release -o /app/backend --no-restore
 
 # Stage 2: Build Frontend (React + Vite)
 FROM node:24.22.1-alpine@sha256:6a1c190e17215d844926b0677f4bf87273ff7d5e54db06d3b5b5863ab0b09a3d AS frontend-build
@@ -23,7 +29,9 @@ FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
 
 # Install Nginx and supervisor
-RUN apt-get update && apt-get install -y nginx supervisor && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends nginx supervisor \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy SSL certificate for MySQL
 COPY ca-certificate.pem /app/
