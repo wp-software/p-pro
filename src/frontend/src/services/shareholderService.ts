@@ -1,5 +1,5 @@
 import { api } from './api';
-import { ShareholderType, ShareholderStatus } from '@/types';
+import { ShareholderType, ShareholderStatus, DocumentType, Gender, MaritalStatus } from '@/types';
 import type {
   Shareholder,
   ShareholderListResponse,
@@ -16,6 +16,26 @@ interface ApiResponse<T> {
   errors?: string[];
 }
 
+// A API serializa enums como texto ("Active"); o frontend usa enums numéricos.
+const toEnum = (enumObj: object, value: unknown): number | undefined => {
+  if (value === null || value === undefined || value === '') return undefined;
+  if (typeof value === 'number') return value;
+  const byName = (enumObj as Record<string, unknown>)[String(value)];
+  if (typeof byName === 'number') return byName;
+  const numeric = Number(value);
+  return Number.isNaN(numeric) ? undefined : numeric;
+};
+
+const normalizeShareholder = (raw: Shareholder): Shareholder => ({
+  ...raw,
+  type: toEnum(ShareholderType, raw.type) as ShareholderType,
+  status: toEnum(ShareholderStatus, raw.status) as ShareholderStatus,
+  documentType: toEnum(DocumentType, raw.documentType) as DocumentType,
+  gender: toEnum(Gender, raw.gender) as Gender | undefined,
+  maritalStatus: toEnum(MaritalStatus, raw.maritalStatus) as MaritalStatus | undefined,
+  companies: raw.companies?.map((c) => ({ ...c, type: toEnum(ShareholderType, c.type) as ShareholderType })),
+});
+
 export const shareholderService = {
   /**
    * Listar sócios com paginação e filtros
@@ -31,7 +51,8 @@ export const shareholderService = {
     if (filters?.companyId) params.companyId = filters.companyId;
     
     const response = await api.get<ApiResponse<ShareholderListResponse>>('/shareholders', { params });
-    return response.data.data;
+    const list = response.data.data;
+    return { ...list, items: list.items.map(normalizeShareholder) };
   },
 
   /**
@@ -39,7 +60,7 @@ export const shareholderService = {
    */
   async getShareholderById(id: string): Promise<Shareholder> {
     const response = await api.get<ApiResponse<Shareholder>>(`/shareholders/${id}`);
-    return response.data.data;
+    return normalizeShareholder(response.data.data);
   },
 
   /**
@@ -47,7 +68,7 @@ export const shareholderService = {
    */
   async createShareholder(data: CreateShareholderRequest): Promise<Shareholder> {
     const response = await api.post<ApiResponse<Shareholder>>('/shareholders', data);
-    return response.data.data;
+    return normalizeShareholder(response.data.data);
   },
 
   /**
@@ -55,7 +76,7 @@ export const shareholderService = {
    */
   async updateShareholder(id: string, data: UpdateShareholderRequest): Promise<Shareholder> {
     const response = await api.put<ApiResponse<Shareholder>>(`/shareholders/${id}`, data);
-    return response.data.data;
+    return normalizeShareholder(response.data.data);
   },
 
   /**
@@ -70,7 +91,7 @@ export const shareholderService = {
    */
   async activateShareholder(id: string): Promise<Shareholder> {
     const response = await api.patch<ApiResponse<Shareholder>>(`/shareholders/${id}/activate`);
-    return response.data.data;
+    return normalizeShareholder(response.data.data);
   },
 
   /**
@@ -78,7 +99,7 @@ export const shareholderService = {
    */
   async deactivateShareholder(id: string): Promise<Shareholder> {
     const response = await api.patch<ApiResponse<Shareholder>>(`/shareholders/${id}/deactivate`);
-    return response.data.data;
+    return normalizeShareholder(response.data.data);
   },
 
   /**
@@ -87,7 +108,7 @@ export const shareholderService = {
   async getShareholderByDocument(document: string): Promise<Shareholder | null> {
     try {
       const response = await api.get<ApiResponse<Shareholder>>(`/shareholders/document/${document}`);
-      return response.data.data;
+      return normalizeShareholder(response.data.data);
     } catch {
       return null;
     }

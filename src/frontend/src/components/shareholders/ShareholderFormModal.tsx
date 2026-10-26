@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { useForm } from 'react-hook-form';
+import { useForm, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { X, Plus, Trash2 } from 'lucide-react';
@@ -403,6 +403,12 @@ export function ShareholderFormModal({
     }
   };
 
+  const onInvalid = (formErrors: FieldErrors<ShareholderFormData>) => {
+    const first = Object.values(formErrors)[0];
+    toast.error(first?.message?.toString() || 'Verifique os campos do formulário');
+    setActiveTab('qualification');
+  };
+
   const documentType = watch('documentType');
   const zipCode = watch('addressZipCode');
 
@@ -506,7 +512,7 @@ export function ShareholderFormModal({
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
+          <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="flex flex-col flex-1 min-h-0">
             <div className="flex-1 overflow-y-auto min-h-0">
             {/* Tab: Qualificação */}
             {activeTab === 'qualification' && (
