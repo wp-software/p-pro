@@ -23,6 +23,7 @@ const typeOptions = [
   { value: ShareholderType.Investor, label: shareholderTypeLabels[ShareholderType.Investor] },
   { value: ShareholderType.Employee, label: shareholderTypeLabels[ShareholderType.Employee] },
   { value: ShareholderType.Advisor, label: shareholderTypeLabels[ShareholderType.Advisor] },
+  { value: ShareholderType.Partner, label: shareholderTypeLabels[ShareholderType.Partner] },
   { value: ShareholderType.Other, label: shareholderTypeLabels[ShareholderType.Other] },
 ];
 

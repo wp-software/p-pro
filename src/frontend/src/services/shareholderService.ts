@@ -1,4 +1,5 @@
 import { api } from './api';
+import { ShareholderType, ShareholderStatus } from '@/types';
 import type {
   Shareholder,
   ShareholderListResponse,
@@ -22,11 +23,11 @@ export const shareholderService = {
   async getShareholders(filters?: ShareholderFilters): Promise<ShareholderListResponse> {
     const params: Record<string, string | number | undefined> = {};
     
-    if (filters?.page) params.pageNumber = filters.page;
+    if (filters?.page) params.page = filters.page;
     if (filters?.pageSize) params.pageSize = filters.pageSize;
     if (filters?.search) params.search = filters.search;
-    if (filters?.type !== undefined) params.type = filters.type;
-    if (filters?.status !== undefined) params.status = filters.status;
+    if (filters?.type !== undefined) params.type = ShareholderType[filters.type];
+    if (filters?.status !== undefined) params.status = ShareholderStatus[filters.status];
     if (filters?.companyId) params.companyId = filters.companyId;
     
     const response = await api.get<ApiResponse<ShareholderListResponse>>('/shareholders', { params });

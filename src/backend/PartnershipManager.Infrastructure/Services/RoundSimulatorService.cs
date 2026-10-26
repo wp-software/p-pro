@@ -434,6 +434,7 @@ public class RoundSimulatorService : IRoundSimulatorService
                 ShareholderType.Employee => "Funcionário",
                 ShareholderType.Advisor => "Conselheiro",
                 ShareholderType.ESOP => "ESOP",
+                ShareholderType.Partner => "Sócio",
                 _ => "Outro"
             };
             

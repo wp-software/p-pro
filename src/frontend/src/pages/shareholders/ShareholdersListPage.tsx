@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Upload, Users, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Upload, Users, Search, ChevronLeft, ChevronRight, LayoutGrid, List } from 'lucide-react';
 import { Button, Card, Spinner, StatCard } from '@/components/ui';
-import { ShareholderCard, ShareholderFilters, ShareholderFormModal, ImportShareholdersModal } from '@/components/shareholders';
+import { ShareholderCard, ShareholderList, ShareholderFilters, ShareholderFormModal, ImportShareholdersModal } from '@/components/shareholders';
 import { useShareholders, useDeleteShareholder } from '@/hooks/useShareholders';
 import { useAuthStore } from '@/stores/authStore';
 import { useConfirm } from '@/components/ui';
@@ -17,6 +17,13 @@ export default function ShareholdersListPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { confirm } = useConfirm();
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>(() =>
+    localStorage.getItem('shareholders.viewMode') === 'list' ? 'list' : 'cards'
+  );
+  const changeViewMode = (mode: 'cards' | 'list') => {
+    setViewMode(mode);
+    localStorage.setItem('shareholders.viewMode', mode);
+  };
   const isAdmin = useAuthStore((s) => s.user?.roles?.includes('Admin') ?? false);
   const [isImportOpen, setIsImportOpen] = useState(false);
 
@@ -48,14 +55,20 @@ export default function ShareholdersListPage() {
   const deleteShareholderMutation = useDeleteShareholder();
 
   // Stats calculation
-  const stats = useMemo(() => {
-    if (!data?.items) return { total: 0, active: 0, pending: 0 };
-    return {
-      total: data.totalCount,
-      active: data.items.filter((s) => s.status === ShareholderStatus.Active).length,
-      pending: data.items.filter((s) => s.status === ShareholderStatus.Pending).length,
-    };
-  }, [data]);
+  const countFilters = (status: ShareholderStatus) => ({
+    page: 1,
+    pageSize: 1,
+    search: search || undefined,
+    type: typeFilter ?? undefined,
+    status,
+  });
+  const { data: activeData } = useShareholders(countFilters(ShareholderStatus.Active));
+  const { data: pendingData } = useShareholders(countFilters(ShareholderStatus.Pending));
+  const stats = {
+    total: data?.totalCount ?? 0,
+    active: activeData?.totalCount ?? 0,
+    pending: pendingData?.totalCount ?? 0,
+  };
 
   // Handlers
   const handleClearFilters = () => {
@@ -167,6 +180,29 @@ export default function ShareholdersListPage() {
         onClearFilters={handleClearFilters}
       />
 
+      <div className="flex justify-end">
+        <div className="inline-flex rounded-lg border border-primary-200 overflow-hidden">
+          <button
+            type="button"
+            title="Cards"
+            aria-pressed={viewMode === 'cards'}
+            onClick={() => changeViewMode('cards')}
+            className={`p-2 ${viewMode === 'cards' ? 'bg-primary text-white' : 'text-primary-500 hover:bg-primary-50'}`}
+          >
+            <LayoutGrid className="w-5 h-5" />
+          </button>
+          <button
+            type="button"
+            title="Lista"
+            aria-pressed={viewMode === 'list'}
+            onClick={() => changeViewMode('list')}
+            className={`p-2 ${viewMode === 'list' ? 'bg-primary text-white' : 'text-primary-500 hover:bg-primary-50'}`}
+          >
+            <List className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
       {/* Loading State */}
       {isLoading && (
         <div className="flex justify-center items-center py-12">
@@ -195,17 +231,21 @@ export default function ShareholdersListPage() {
       {/* Cards Grid */}
       {!isLoading && !isError && data?.items && data.items.length > 0 && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {data.items.map((shareholder) => (
-              <ShareholderCard
-                key={shareholder.id}
-                shareholder={shareholder}
-                onView={handleView}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-              />
-            ))}
-          </div>
+          {viewMode === 'list' ? (
+            <ShareholderList shareholders={data.items} onView={handleView} onEdit={handleEdit} />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {data.items.map((shareholder) => (
+                <ShareholderCard
+                  key={shareholder.id}
+                  shareholder={shareholder}
+                  onView={handleView}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </div>
+          )}
 
           {/* Pagination */}
           {totalPages > 1 && (

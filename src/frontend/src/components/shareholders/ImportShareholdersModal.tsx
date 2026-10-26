@@ -20,6 +20,7 @@ const TYPE_MAP: Record<string, ShareholderType> = {
   funcionario: ShareholderType.Employee,
   consultor: ShareholderType.Advisor,
   esop: ShareholderType.ESOP,
+  socio: ShareholderType.Partner,
   outro: ShareholderType.Other,
 };
 
@@ -52,7 +53,7 @@ const COLUMNS = [
   { header: 'Nome*', key: 'name', width: 32 },
   { header: 'Tipo Documento* (CPF/CNPJ)', key: 'documentType', width: 26 },
   { header: 'Documento* (somente números)', key: 'document', width: 28 },
-  { header: 'Tipo Sócio* (Fundador/Investidor/Funcionario/Consultor/ESOP/Outro)', key: 'type', width: 40 },
+  { header: 'Tipo Sócio* (Fundador/Investidor/Funcionario/Consultor/ESOP/Socio/Outro)', key: 'type', width: 40 },
   { header: 'E-mail', key: 'email', width: 30 },
   { header: 'Telefone', key: 'phone', width: 18 },
   { header: 'Data Nascimento (AAAA-MM-DD)', key: 'birthDate', width: 22 },
@@ -140,7 +141,7 @@ export function ImportShareholdersModal({ isOpen, onClose }: Props) {
     const textCols = ['document', 'addressNumber', 'addressZipCode', 'phone', 'birthDate'];
     for (let r = 2; r <= 500; r++) {
       ws.getCell(r, 2).dataValidation = list('CPF,CNPJ');
-      ws.getCell(r, 4).dataValidation = list('Fundador,Investidor,Funcionario,Consultor,ESOP,Outro');
+      ws.getCell(r, 4).dataValidation = list('Fundador,Investidor,Funcionario,Consultor,ESOP,Socio,Outro');
       ws.getCell(r, 8).dataValidation = list('Masculino,Feminino,Outro,Nao informado');
       ws.getCell(r, 9).dataValidation = list('Solteiro,Casado,Uniao estavel,Divorciado,Viuvo');
       BOOL_FIELDS.forEach((_, i) => {

@@ -9,6 +9,7 @@ export enum ShareholderType {
   Employee = 3,
   Advisor = 4,
   ESOP = 5,
+  Partner = 6,
   Other = 99,
 }
 
@@ -170,6 +171,7 @@ export const shareholderTypeLabels: Record<ShareholderType, string> = {
   [ShareholderType.Employee]: 'Funcionário',
   [ShareholderType.Advisor]: 'Advisor',
   [ShareholderType.ESOP]: 'ESOP',
+  [ShareholderType.Partner]: 'Sócio',
   [ShareholderType.Other]: 'Outro',
 };
 

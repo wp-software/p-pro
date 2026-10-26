@@ -30,6 +30,7 @@ const typeColors: Record<ShareholderType, string> = {
   [ShareholderType.Employee]: 'bg-green-100 text-green-700 border-green-200',
   [ShareholderType.Advisor]: 'bg-amber-100 text-amber-700 border-amber-200',
   [ShareholderType.ESOP]: 'bg-cyan-100 text-cyan-700 border-cyan-200',
+  [ShareholderType.Partner]: 'bg-indigo-100 text-indigo-700 border-indigo-200',
   [ShareholderType.Other]: 'bg-gray-100 text-gray-700 border-gray-200',
 };
 
@@ -39,6 +40,7 @@ const typeIcons: Record<ShareholderType, ComponentType<{ className?: string }>> 
   [ShareholderType.Employee]: User,
   [ShareholderType.Advisor]: Briefcase,
   [ShareholderType.ESOP]: Users,
+  [ShareholderType.Partner]: Users,
   [ShareholderType.Other]: CircleDashed,
 };
 

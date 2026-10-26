@@ -442,9 +442,9 @@ public class ShareholderRepository : IShareholderRepository
 
     public async Task<Dictionary<Guid, List<ShareholderCompanyLink>>> GetCompanyLinksAsync(IEnumerable<Guid> shareholderIds)
     {
-        var ids = shareholderIds.Select(i => i.ToString()).ToList();
+        var ids = shareholderIds.Select(i => i.ToString()).ToArray();
         var result = new Dictionary<Guid, List<ShareholderCompanyLink>>();
-        if (ids.Count == 0) return result;
+        if (ids.Length == 0) return result;
 
         var rows = await Connection.QueryAsync<dynamic>(
             @"SELECT sc.shareholder_id AS ShareholderId, sc.company_id AS CompanyId, c.name AS CompanyName,

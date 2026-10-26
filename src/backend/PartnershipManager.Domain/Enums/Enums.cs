@@ -66,6 +66,7 @@ public enum ShareholderType
     Employee = 3,
     Advisor = 4,
     ESOP = 5,
+    Partner = 6,
     Other = 99
 }
 
