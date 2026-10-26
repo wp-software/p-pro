@@ -18,6 +18,7 @@ public record FinancialMetricDefinitionResponse
     public bool IsSystem { get; init; }
     public bool IsCalculated { get; init; }
     public bool IsActive { get; init; }
+    public bool InUse { get; init; }
 }
 
 public record CreateMetricDefinitionRequest

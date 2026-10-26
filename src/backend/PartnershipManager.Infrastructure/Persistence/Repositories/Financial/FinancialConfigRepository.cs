@@ -90,6 +90,23 @@ public class FinancialConfigRepository : IFinancialConfigRepository
             p, _context.Transaction);
     }
 
+    public async Task<IReadOnlyCollection<Guid>> GetDefinitionIdsWithValuesAsync(Guid clientId, Guid companyId)
+    {
+        const string sql = @"
+            SELECT DISTINCT v.definition_id
+            FROM financial_metric_values v
+            JOIN financial_metric_definitions d ON d.id = v.definition_id
+            WHERE v.client_id = @ClientId AND d.company_id = @CompanyId AND v.value IS NOT NULL";
+
+        var rows = await _context.Connection.QueryAsync<dynamic>(sql, new
+        {
+            ClientId = clientId.ToString(),
+            CompanyId = companyId.ToString()
+        }, _context.Transaction);
+
+        return rows.Select(r => ParseGuid((object?)r.definition_id)).ToList();
+    }
+
     // ─── Values ──────────────────────────────────────────────────────────────
 
     public Task<IReadOnlyList<FinancialMetricValue>> GetValuesByPeriodAsync(Guid periodId, Guid clientId)

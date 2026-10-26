@@ -11,6 +11,8 @@ public interface IFinancialConfigRepository
     Task UpdateDefinitionAsync(FinancialMetricDefinition definition);
     /// <summary>Deletes a custom definition together with its stored values.</summary>
     Task DeleteDefinitionAsync(Guid id, Guid clientId);
+    /// <summary>Ids of the company's definitions that have at least one stored value.</summary>
+    Task<IReadOnlyCollection<Guid>> GetDefinitionIdsWithValuesAsync(Guid clientId, Guid companyId);
 
     Task<IReadOnlyList<FinancialMetricValue>> GetValuesByPeriodAsync(Guid periodId, Guid clientId);
     Task<IReadOnlyList<FinancialMetricValue>> GetValuesByPeriodsAsync(IEnumerable<Guid> periodIds, Guid clientId);

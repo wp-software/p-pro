@@ -199,6 +199,7 @@ export interface FinancialMetricDefinition {
   isSystem: boolean;
   isCalculated: boolean;
   isActive: boolean;
+  inUse?: boolean;
 }
 
 export interface CreateMetricDefinitionRequest {

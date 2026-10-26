@@ -75,7 +75,11 @@ public partial class FinancialMetricConfigService : IFinancialMetricConfigServic
         Guid clientId, Guid companyId, bool includeInactive = false)
     {
         var defs = await LoadDefinitionsAsync(clientId, companyId, includeInactive);
-        return defs.Select(MapDefinition).ToList();
+        var withValues = await _config.GetDefinitionIdsWithValuesAsync(clientId, companyId);
+        var widgets = await _config.GetWidgetsAsync(clientId, companyId);
+        var usedIds = withValues.ToHashSet();
+        var widgetKeys = widgets.SelectMany(w => w.MetricKeys).ToHashSet();
+        return defs.Select(d => MapDefinition(d, usedIds.Contains(d.Id) || widgetKeys.Contains(d.MetricKey))).ToList();
     }
 
     public async Task<FinancialMetricDefinitionResponse> CreateDefinitionAsync(Guid clientId, CreateMetricDefinitionRequest request)
@@ -148,6 +152,11 @@ public partial class FinancialMetricConfigService : IFinancialMetricConfigServic
             await _config.UpdateDefinitionAsync(def);
             return;
         }
+
+        var withValues = await _config.GetDefinitionIdsWithValuesAsync(clientId, def.CompanyId);
+        var widgets = await _config.GetWidgetsAsync(clientId, def.CompanyId);
+        if (withValues.Contains(def.Id) || widgets.Any(w => w.MetricKeys.Contains(def.MetricKey)))
+            throw new DomainException("Esta métrica já foi utilizada e não pode ser excluída. Você pode ocultá-la.");
 
         await _config.DeleteDefinitionAsync(id, clientId);
     }
@@ -427,8 +436,11 @@ public partial class FinancialMetricConfigService : IFinancialMetricConfigServic
             }).ToList()
         };
 
-    private static FinancialMetricDefinitionResponse MapDefinition(FinancialMetricDefinition d) => new()
+    private static FinancialMetricDefinitionResponse MapDefinition(FinancialMetricDefinition d) => MapDefinition(d, false);
+
+    private static FinancialMetricDefinitionResponse MapDefinition(FinancialMetricDefinition d, bool inUse) => new()
     {
+        InUse = inUse,
         Id = d.Id,
         CompanyId = d.CompanyId,
         Key = d.MetricKey,
