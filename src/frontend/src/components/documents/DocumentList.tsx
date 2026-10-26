@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Spinner } from '@/components/ui';
+import { ConfirmDialog, Spinner, useConfirm } from '@/components/ui';
 import { useDocuments, useVerifyDocument, useDeleteDocument } from '@/hooks';
 import { type DocumentFilters } from '@/types';
 import DocumentCard from './DocumentCard';
@@ -23,6 +23,7 @@ export default function DocumentList({
   referenceId,
   readonly = false,
 }: DocumentListProps) {
+  const { confirm, confirmState, handleCancel } = useConfirm();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const pageSize = 8;
@@ -49,11 +50,21 @@ export default function DocumentList({
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Excluir este documento?')) return;
+    const document = items.find((item) => item.id === id);
+    if (!document) return;
+    const confirmed = await confirm({
+      title: 'Excluir documento',
+      message: `Tem certeza que deseja excluir "${document.name}"?`,
+      confirmText: 'Excluir',
+      confirmVariant: 'danger',
+    });
+    if (!confirmed) return;
     setDeletingId(id);
-    await deleteDoc.mutateAsync(id).finally(() => {
-      setDeletingId(null);
-      refetch();
+    deleteDoc.mutate(id, {
+      onSettled: () => {
+        setDeletingId(null);
+        refetch();
+      },
     });
   }
 
@@ -62,6 +73,7 @@ export default function DocumentList({
 
   return (
     <div className="space-y-3">
+      <ConfirmDialog {...confirmState} onCancel={handleCancel} />
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />

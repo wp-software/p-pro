@@ -65,6 +65,9 @@ public class FinancialUploadResult
     public string FolderPath { get; set; } = string.Empty;
 }
 
+/// <summary>Identifies the document created by a Data Room upload.</summary>
+public sealed record DataRoomUploadResult(Guid DocumentId);
+
 public class FinancialDocumentResponse
 {
     public Guid DocumentId { get; set; }

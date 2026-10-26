@@ -1,6 +1,6 @@
 import { useRef, useState, type DragEvent } from 'react';
 import { X, UploadCloud, FileText, Download, Trash2 } from 'lucide-react';
-import { Button, Spinner, useConfirm } from '@/components/ui';
+import { Button, ConfirmDialog, Spinner, useConfirm } from '@/components/ui';
 import {
   useFinancialDocuments,
   useUploadFinancialDocument,
@@ -36,7 +36,7 @@ interface Props {
 }
 
 export default function MetricDocumentsDrawer({ periodId, year, month, metricKey, title, canUpload, onClose }: Props) {
-  const { confirm } = useConfirm();
+  const { confirm, confirmState, handleCancel } = useConfirm();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [documentType, setDocumentType] = useState('other');
@@ -88,22 +88,23 @@ export default function MetricDocumentsDrawer({ periodId, year, month, metricKey
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={`Documentos — ${title}`}>
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <aside className="relative w-full max-w-md bg-white shadow-xl flex flex-col animate-fade-in">
-        <header className="flex items-start justify-between gap-3 p-5 border-b border-gray-100">
-          <div>
-            <h2 className="text-base font-semibold text-gray-900">Documentos</h2>
-            <p className="text-sm text-gray-500">
-              {title} · {String(month).padStart(2, '0')}/{year}
-            </p>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100" aria-label="Fechar">
-            <X size={18} />
-          </button>
-        </header>
+    <>
+      <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={`Documentos — ${title}`}>
+        <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+        <aside className="relative w-full max-w-md bg-white shadow-xl flex flex-col animate-fade-in">
+          <header className="flex items-start justify-between gap-3 p-5 border-b border-gray-100">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">Documentos</h2>
+              <p className="text-sm text-gray-500">
+                {title} · {String(month).padStart(2, '0')}/{year}
+              </p>
+            </div>
+            <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100" aria-label="Fechar">
+              <X size={18} />
+            </button>
+          </header>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {canUpload && (
             <div className="space-y-3">
               {!file ? (
@@ -202,8 +203,10 @@ export default function MetricDocumentsDrawer({ periodId, year, month, metricKey
               </ul>
             )}
           </div>
-        </div>
-      </aside>
-    </div>
+          </div>
+        </aside>
+      </div>
+      <ConfirmDialog {...confirmState} onCancel={handleCancel} />
+    </>
   );
 }

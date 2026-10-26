@@ -42,6 +42,7 @@ export interface Document {
   downloadUrl: string | null;
   entityType: string | null;
   entityId: string | null;
+  source?: 'dataroom' | 'financial' | 'documents';
   visibility: string;
   isVerified: boolean;
   verifiedAt: string | null;

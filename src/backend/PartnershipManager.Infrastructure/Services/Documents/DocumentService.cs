@@ -117,10 +117,22 @@ public class DocumentService : IDocumentService
             DownloadUrl = d.DownloadUrl,
             EntityType = d.EntityType,
             EntityId = d.EntityId,
+            Source = GetSource(d),
             Visibility = d.Visibility,
             IsVerified = d.IsVerified,
             VerifiedAt = d.VerifiedAt,
             CreatedAt = d.CreatedAt,
             UpdatedAt = d.UpdatedAt
         };
+
+    private static string GetSource(Document document)
+    {
+        if (string.Equals(document.EntityType, DocumentEntityTypes.FinancialPeriod, StringComparison.OrdinalIgnoreCase))
+            return "financial";
+
+        var storagePath = document.StoragePath.Replace('\\', '/').TrimStart('/');
+        return storagePath.StartsWith("dataroom/", StringComparison.OrdinalIgnoreCase)
+            ? "dataroom"
+            : "documents";
+    }
 }

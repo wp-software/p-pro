@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { FolderOpen, Folder, Plus, Trash2, FileText, Link, Unlink, Shield, History } from 'lucide-react';
-import { Button, Card, Spinner } from '@/components/ui';
+import { FolderOpen, Folder, Plus, Trash2, FileText, Link, Unlink, Shield, History, UploadCloud } from 'lucide-react';
+import { Button, Card, ConfirmDialog, Spinner } from '@/components/ui';
 import {
   useDataRoomFolders,
   useDocumentsInFolder,
   useCreateFolder,
   useDeleteFolder,
   useAddDocumentToFolder,
+  useUploadDocumentToFolder,
   useRemoveDocumentFromFolder,
   useSetFolderRoles,
   useDataRoomActivityLogs,
@@ -187,11 +188,45 @@ function AddDocumentForm({ folderId, onClose }: AddDocumentFormProps) {
   );
 }
 
+function UploadDocumentForm({ folderId, onClose }: AddDocumentFormProps) {
+  const [file, setFile] = useState<File | null>(null);
+  const upload = useUploadDocumentToFolder();
+
+  return (
+    <form
+      className="flex flex-wrap items-center gap-3 p-3 bg-primary-50 rounded-lg"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (file) upload.mutate({ folderId, file }, { onSuccess: onClose });
+      }}
+    >
+      <label className="flex-1 min-w-48 text-sm text-primary-600">
+        <span className="sr-only">Selecionar arquivo</span>
+        <input
+          autoFocus
+          required
+          type="file"
+          className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-700"
+          onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+          disabled={upload.isPending}
+        />
+      </label>
+      <Button size="sm" type="submit" disabled={!file} loading={upload.isPending}>
+        Enviar
+      </Button>
+      <Button size="sm" type="button" variant="secondary" onClick={onClose} disabled={upload.isPending}>
+        Cancelar
+      </Button>
+    </form>
+  );
+}
+
 export default function DataRoomPage() {
-  const { confirm } = useConfirm();
+  const { confirm, confirmState, handleCancel } = useConfirm();
   const [selectedFolderState, setSelectedFolder] = useState<DataRoomFolder | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [showAddDoc, setShowAddDoc] = useState(false);
+  const [showUploadDoc, setShowUploadDoc] = useState(false);
   const [showRoles, setShowRoles] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const isAdmin = useAuthStore((s) =>
@@ -232,6 +267,7 @@ export default function DataRoomPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <ConfirmDialog {...confirmState} onCancel={handleCancel} />
       <div>
         <h1 className="page-title">Data Room</h1>
         <p className="page-subtitle">Organize e compartilhe documentos com investidores</p>
@@ -310,11 +346,18 @@ export default function DataRoomPage() {
                   </button>
                 )}
                 <button
+                  onClick={() => setShowUploadDoc(true)}
+                  className="flex items-center gap-1.5 text-xs text-accent hover:text-accent/80 font-medium transition-colors"
+                >
+                  <UploadCloud className="w-3.5 h-3.5" />
+                  Enviar arquivo
+                </button>
+                <button
                   onClick={() => setShowAddDoc(true)}
                   className="flex items-center gap-1.5 text-xs text-accent hover:text-accent/80 font-medium transition-colors"
                 >
                   <Link className="w-3.5 h-3.5" />
-                  Adicionar documento
+                  Vincular existente
                 </button>
               </div>
             )}
@@ -338,6 +381,11 @@ export default function DataRoomPage() {
                 {showAddDoc && (
                   <div className="mb-4">
                     <AddDocumentForm folderId={selectedFolder.id} onClose={() => setShowAddDoc(false)} />
+                  </div>
+                )}
+                {showUploadDoc && (
+                  <div className="mb-4">
+                    <UploadDocumentForm folderId={selectedFolder.id} onClose={() => setShowUploadDoc(false)} />
                   </div>
                 )}
                 {documents.length === 0 ? (
@@ -378,7 +426,8 @@ export default function DataRoomPage() {
                         )}
                         <button
                           onClick={() => handleRemoveDoc(doc.id)}
-                          className="opacity-0 group-hover:opacity-100 p-1 rounded text-red-400 hover:text-red-600 transition-all"
+                          className="shrink-0 p-1 rounded text-red-500 hover:text-red-700 transition-colors"
+                          aria-label={`Remover ${doc.name} da pasta`}
                           title="Remover da pasta"
                         >
                           <Unlink className="w-3.5 h-3.5" />

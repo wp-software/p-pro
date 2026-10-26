@@ -75,6 +75,21 @@ export function useAddDocumentToFolder() {
   });
 }
 
+export function useUploadDocumentToFolder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ folderId, file }: { folderId: string; file: File }) =>
+      dataRoomService.uploadDocumentToFolder(folderId, file),
+    onSuccess: (_, { folderId }) => {
+      queryClient.invalidateQueries({ queryKey: [...QUERY_KEY, 'folder-docs', folderId] });
+      toast.success('Documento enviado com sucesso');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Erro ao enviar documento');
+    },
+  });
+}
+
 export function useRemoveDocumentFromFolder() {
   const queryClient = useQueryClient();
   return useMutation({

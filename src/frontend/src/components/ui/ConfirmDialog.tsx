@@ -105,15 +105,18 @@ export function useConfirm() {
     message: '',
     onConfirm: () => {},
   });
+  const resolveConfirmation = React.useRef<((confirmed: boolean) => void) | null>(null);
 
   const confirm = (options: ConfirmOptions): Promise<boolean> => {
     return new Promise((resolve) => {
+      resolveConfirmation.current = resolve;
       setConfirmState({
         ...options,
         isOpen: true,
         isLoading: false,
         onConfirm: async () => {
-          resolve(true);
+          resolveConfirmation.current?.(true);
+          resolveConfirmation.current = null;
           setConfirmState((prev) => ({ ...prev, isOpen: false }));
         },
       });
@@ -121,6 +124,8 @@ export function useConfirm() {
   };
 
   const handleCancel = () => {
+    resolveConfirmation.current?.(false);
+    resolveConfirmation.current = null;
     setConfirmState((prev) => ({ ...prev, isOpen: false }));
   };
 

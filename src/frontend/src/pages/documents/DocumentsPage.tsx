@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Plus, Search, FileText, ShieldCheck, Trash2 } from 'lucide-react';
 import {
   Button, Card, Spinner, Badge, StatCard,
+  ConfirmDialog, useConfirm,
 } from '@/components/ui';
 import {
   useDocuments,
@@ -42,6 +43,18 @@ const TYPE_LABELS: Record<string, string> = {
   valuation_report: 'Relatório Valuation', other: 'Outro',
 };
 
+const SOURCE_LABELS: Record<string, string> = {
+  dataroom: 'Data Room',
+  financial: 'Financeiro',
+  documents: 'Documents',
+};
+
+const SOURCE_COLORS: Record<string, string> = {
+  dataroom: 'bg-blue-50 text-blue-700',
+  financial: 'bg-green-50 text-green-700',
+  documents: 'bg-gray-100 text-gray-600',
+};
+
 function formatFileSize(bytes?: number) {
   if (!bytes) return '—';
   if (bytes < 1024) return `${bytes} B`;
@@ -62,6 +75,7 @@ export default function DocumentsPage() {
   const [page, setPage] = useState(1);
   const [showNew, setShowNew] = useState(false);
   const [form, setForm] = useState<CreateDocumentRequest>(EMPTY_FORM);
+  const { confirm, confirmState, handleCancel } = useConfirm();
 
   const filters: DocumentFilters = {
     companyId: selectedCompanyId || undefined,
@@ -77,8 +91,6 @@ export default function DocumentsPage() {
   const verifyDoc = useVerifyDocument();
   const deleteDoc = useDeleteDocument();
 
-  const [deleting, setDeleting] = useState<string | null>(null);
-
   async function handleCreate() {
     if (!form.name || !form.documentType || !form.storagePath) {
       toast.error('Preencha nome, tipo e caminho do arquivo.');
@@ -89,12 +101,23 @@ export default function DocumentsPage() {
     setShowNew(false);
   }
 
+  async function handleDelete(docId: string, name: string) {
+    const ok = await confirm({
+      title: 'Excluir documento',
+      message: `Tem certeza que deseja excluir "${name}"?`,
+      confirmText: 'Excluir',
+      confirmVariant: 'danger',
+    });
+    if (ok) deleteDoc.mutate(docId);
+  }
+
   const totalCount = data?.total ?? 0;
   const verified = data?.items.filter((d) => d.isVerified).length ?? 0;
   const totalPages = data ? Math.ceil(data.total / 15) : 1;
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <ConfirmDialog {...confirmState} onCancel={handleCancel} />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -246,6 +269,7 @@ export default function DocumentsPage() {
                 <tr className="border-b border-gray-100 text-xs text-gray-400 uppercase tracking-wide">
                   <th className="px-4 py-3 text-left">Nome</th>
                   <th className="px-4 py-3 text-left">Tipo</th>
+                  <th className="px-4 py-3 text-left">Origem</th>
                   <th className="px-4 py-3 text-left">Tamanho</th>
                   <th className="px-4 py-3 text-left">Visibilidade</th>
                   <th className="px-4 py-3 text-left">Verificado</th>
@@ -259,6 +283,11 @@ export default function DocumentsPage() {
                     <td className="px-4 py-3 font-medium text-gray-900">{doc.name}</td>
                     <td className="px-4 py-3 text-gray-500">
                       {TYPE_LABELS[doc.documentType] ?? doc.documentType}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge className={SOURCE_COLORS[doc.source ?? 'documents']}>
+                        {SOURCE_LABELS[doc.source ?? 'documents']}
+                      </Badge>
                     </td>
                     <td className="px-4 py-3 text-gray-500">
                       {formatFileSize(doc.fileSizeBytes)}
@@ -290,20 +319,11 @@ export default function DocumentsPage() {
                           </button>
                         )}
                         <button
-                          onClick={() => {
-                            if (deleting === doc.id) {
-                              deleteDoc.mutate(doc.id);
-                              setDeleting(null);
-                            } else {
-                              setDeleting(doc.id);
-                            }
-                          }}
-                          className={`p-1.5 rounded transition-colors ${
-                            deleting === doc.id
-                              ? 'bg-red-100 text-red-600'
-                              : 'hover:bg-red-50 text-gray-400'
-                          }`}
-                          title={deleting === doc.id ? 'Confirmar exclusão' : 'Excluir'}
+                          onClick={() => handleDelete(doc.id, doc.name)}
+                          disabled={deleteDoc.isPending}
+                          className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                          title="Excluir"
+                          aria-label={`Excluir ${doc.name}`}
                         >
                           <Trash2 size={14} />
                         </button>

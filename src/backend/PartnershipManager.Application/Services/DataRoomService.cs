@@ -13,6 +13,9 @@ public interface IDataRoomService
     Task DeleteFolderAsync(Guid companyId, Guid folderId, DataRoomUser user);
     Task<IEnumerable<Document>> GetDocumentsInFolderAsync(Guid companyId, Guid folderId, DataRoomUser user);
     Task AddDocumentToFolderAsync(Guid companyId, Guid folderId, Guid documentId, DataRoomUser user);
+    Task<DataRoomUploadResult> UploadDocumentAsync(Guid clientId, Guid companyId, Guid folderId,
+        string documentName, string documentType, string fileName, long fileSize, string mimeType,
+        Func<CancellationToken, Task<string>> persistFile, DataRoomUser user, CancellationToken cancellationToken);
     Task RemoveDocumentFromFolderAsync(Guid companyId, Guid folderId, Guid documentId, DataRoomUser user);
     Task SetFolderRolesAsync(Guid companyId, Guid folderId, IEnumerable<string> roles, DataRoomUser user);
     Task<IEnumerable<DataRoomActivityLogResponse>> GetActivityLogsAsync(Guid companyId, DataRoomUser user, Guid? folderId, int limit);
@@ -182,6 +185,21 @@ public class DataRoomService : IDataRoomService
         await _repo.AddDocumentToFolderAsync(folderId, documentId, user.UserId);
         var name = await _repo.GetDocumentNameAsync(documentId);
         await LogAsync(room, folder, documentId, name, DataRoomActions.DocumentAdded, user);
+    }
+
+    public async Task<DataRoomUploadResult> UploadDocumentAsync(Guid clientId, Guid companyId, Guid folderId,
+        string documentName, string documentType, string fileName, long fileSize, string mimeType,
+        Func<CancellationToken, Task<string>> persistFile, DataRoomUser user, CancellationToken cancellationToken)
+    {
+        var (room, folder) = await RequireFolderAccessAsync(companyId, folderId, user);
+        var storagePath = await persistFile(cancellationToken);
+        var document = Document.Create(clientId, companyId, documentName, documentType, fileName, fileSize,
+            mimeType, storagePath, DocumentVisibility.Admin, createdBy: user.UserId);
+        await _unitOfWork.Documents.AddAsync(document);
+        await _repo.AddDocumentToFolderAsync(folderId, document.Id, user.UserId);
+        await LogAsync(room, folder, document.Id, document.Name, DataRoomActions.DocumentAdded, user, "Upload");
+
+        return new DataRoomUploadResult(document.Id);
     }
 
     public async Task RemoveDocumentFromFolderAsync(Guid companyId, Guid folderId, Guid documentId, DataRoomUser user)

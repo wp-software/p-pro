@@ -22,6 +22,7 @@ public record DocumentResponse
     public string? DownloadUrl { get; init; }
     public string? EntityType { get; init; }
     public Guid? EntityId { get; init; }
+    public string Source { get; init; } = "documents";
     public string Visibility { get; init; } = string.Empty;
     public bool IsVerified { get; init; }
     public DateTime? VerifiedAt { get; init; }

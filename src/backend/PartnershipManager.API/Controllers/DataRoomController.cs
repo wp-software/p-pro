@@ -135,6 +135,66 @@ public class DataRoomController : BaseApiController
         catch (Exception ex) { return Fail(ex, "Erro ao adicionar documento"); }
     }
 
+    /// <summary>Envia um arquivo diretamente para uma pasta do Data Room.</summary>
+    [HttpPost("folders/{id:guid}/documents/upload")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(MaxUploadBytes)]
+    [ProducesResponseType(typeof(ApiResponse<DataRoomUploadResult>), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UploadDocument(Guid id, [FromForm] IFormFile file, [FromForm] string? name,
+        [FromForm] string? documentType, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { message = "Arquivo é obrigatório." });
+            if (file.Length > MaxUploadBytes)
+                return BadRequest(new { message = "Arquivo excede o limite de 50 MB." });
+
+            var companyId = HttpContext.GetRequiredCompanyId();
+            var clientId = HttpContext.GetRequiredClientId();
+            var originalName = Path.GetFileName(file.FileName);
+            var documentName = string.IsNullOrWhiteSpace(name)
+                ? Path.GetFileNameWithoutExtension(originalName)
+                : name.Trim();
+            var type = string.IsNullOrWhiteSpace(documentType) ? DocumentTypes.Other : documentType;
+
+            var result = await _service.UploadDocumentAsync(
+                clientId, companyId, id, documentName, type, originalName, file.Length,
+                string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
+                async ct =>
+                {
+                    var relative = Path.Combine("dataroom", companyId.ToString(), $"{Guid.NewGuid():N}{Path.GetExtension(originalName)}");
+                    var full = Path.Combine(_storageBasePath, relative);
+                    Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+                    var fileCreated = false;
+                    try
+                    {
+                        await using var fs = new FileStream(full, FileMode.CreateNew, FileAccess.Write);
+                        fileCreated = true;
+                        await file.CopyToAsync(fs, ct);
+                    }
+                    catch
+                    {
+                        if (fileCreated && System.IO.File.Exists(full))
+                            System.IO.File.Delete(full);
+                        throw;
+                    }
+                    return relative;
+                },
+                CurrentUser(), cancellationToken);
+
+            return CreatedAtAction(nameof(GetDocuments), new { id }, ApiResponse<DataRoomUploadResult>.Ok(result));
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return new EmptyResult();
+        }
+        catch (Exception ex) { return Fail(ex, "Erro ao enviar documento"); }
+    }
+
     [HttpDelete("folders/{folderId:guid}/documents/{documentId:guid}")]
     public async Task<IActionResult> RemoveDocument(Guid folderId, Guid documentId)
     {

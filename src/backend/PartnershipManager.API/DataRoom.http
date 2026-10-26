@@ -1,0 +1,16 @@
+@baseUrl = http://localhost:5000/api
+@token = replace-with-a-valid-jwt
+@folderId = 00000000-0000-0000-0000-000000000000
+@filePath = ./document.pdf
+
+### Upload a document into a Data Room folder
+POST {{baseUrl}}/dataroom/folders/{{folderId}}/documents/upload
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=DataRoomUploadBoundary
+
+--DataRoomUploadBoundary
+Content-Disposition: form-data; name="file"; filename="document.pdf"
+Content-Type: application/pdf
+
+< {{filePath}}
+--DataRoomUploadBoundary--

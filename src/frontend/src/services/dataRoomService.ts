@@ -46,6 +46,18 @@ export const dataRoomService = {
     await api.post(`/dataroom/folders/${folderId}/documents`, { documentId });
   },
 
+  async uploadDocumentToFolder(folderId: string, file: File): Promise<{ documentId: string }> {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('documentType', 'other');
+    const response = await api.post<ApiResponse<{ documentId: string }>>(
+      `/dataroom/folders/${folderId}/documents/upload`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return response.data.data;
+  },
+
   async removeDocumentFromFolder(folderId: string, documentId: string): Promise<void> {
     await api.delete(`/dataroom/folders/${folderId}/documents/${documentId}`);
   },
