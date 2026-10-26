@@ -7,13 +7,15 @@ RUN dotnet restore
 RUN dotnet publish -c Release -o /app/backend
 
 # Stage 2: Build Frontend (React + Vite)
-FROM node:20-alpine AS frontend-build
+FROM node:24.22.1-alpine@sha256:6a1c190e17215d844926b0677f4bf87273ff7d5e54db06d3b5b5863ab0b09a3d AS frontend-build
 WORKDIR /src/frontend
 
-COPY src/frontend/package*.json ./
+RUN chown node:node /src/frontend
+COPY --chown=node:node src/frontend/package*.json ./
+USER node
 RUN npm ci
 
-COPY src/frontend/ ./
+COPY --chown=node:node src/frontend/ ./
 RUN npm run build
 
 # Stage 3: Runtime - Backend + Nginx for Frontend

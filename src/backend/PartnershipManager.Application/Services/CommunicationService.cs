@@ -1,7 +1,7 @@
 using System.Text.Json;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using PartnershipManager.Application.Common.Security;
 using PartnershipManager.Application.Common.Models;
 using PartnershipManager.Application.DTOs.Communication;
 using PartnershipManager.Domain.Entities;
@@ -30,7 +30,6 @@ public class CommunicationService : ICommunicationService
     private readonly IUnitOfWork _uow;
     private readonly ILogger<CommunicationService> _logger;
     private readonly IConfiguration _configuration;
-    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public CommunicationService(
         ICommunicationRepository repo,
@@ -38,8 +37,7 @@ public class CommunicationService : ICommunicationService
         IEmailService emailService,
         IUnitOfWork uow,
         ILogger<CommunicationService> logger,
-        IConfiguration configuration,
-        IHttpContextAccessor httpContextAccessor)
+        IConfiguration configuration)
     {
         _repo = repo;
         _notificationService = notificationService;
@@ -47,15 +45,11 @@ public class CommunicationService : ICommunicationService
         _uow = uow;
         _logger = logger;
         _configuration = configuration;
-        _httpContextAccessor = httpContextAccessor;
     }
 
     private string GetFrontendUrl()
     {
-        var origin = _httpContextAccessor.HttpContext?.Request.Headers["Origin"].FirstOrDefault();
-        if (!string.IsNullOrEmpty(origin))
-            return origin.TrimEnd('/');
-        return (_configuration["Email:FrontendUrl"] ?? "http://localhost:3000").TrimEnd('/');
+        return (_configuration["Email:FrontendUrl"] ?? "http://localhost:5173").TrimEnd('/');
     }
 
     public async Task<PagedResult<CommunicationListResponse>> GetByCompanyAsync(
@@ -83,7 +77,7 @@ public class CommunicationService : ICommunicationService
             CompanyId = companyId,
             Title = request.Title,
             Content = request.Content,
-            ContentHtml = request.ContentHtml,
+            ContentHtml = HtmlContentSanitizer.Sanitize(request.ContentHtml),
             Summary = request.Summary,
             CommType = request.CommType,
             Visibility = request.Visibility,
@@ -104,7 +98,7 @@ public class CommunicationService : ICommunicationService
 
         c.Title = request.Title;
         c.Content = request.Content;
-        c.ContentHtml = request.ContentHtml;
+        c.ContentHtml = HtmlContentSanitizer.Sanitize(request.ContentHtml);
         c.Summary = request.Summary;
         c.CommType = request.CommType;
         c.Visibility = request.Visibility;

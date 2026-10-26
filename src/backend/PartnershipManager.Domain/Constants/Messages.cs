@@ -125,6 +125,7 @@ public static class SystemConstants
     public const int MaxPasswordLength = 100;
     public const int TokenExpirationHours = 24;
     public const int RefreshTokenDays = 7;
+    public const int SessionIdleTimeoutMinutes = 5;
     
     // =============== VALIDAÇÃO ===============
     public const int MaxNameLength = 200;

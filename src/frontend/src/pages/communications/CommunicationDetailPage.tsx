@@ -6,6 +6,7 @@ import { useCommunication } from '@/hooks/useCommunications';
 import { communicationService } from '@/services/communicationService';
 import { formatDate } from '@/utils/format';
 import { cn } from '@/utils/cn';
+import { sanitizeHtml } from '@/utils/sanitizeHtml';
 
 const TYPE_LABELS: Record<string, string> = {
   announcement: 'Anúncio',
@@ -114,12 +115,7 @@ export default function CommunicationDetailPage() {
           {comm.contentHtml ? (
             <div
               className="prose prose-primary max-w-none"
-              dangerouslySetInnerHTML={{
-                __html: comm.contentHtml
-                  .replace(/<script[\s\S]*?<\/script>/gi, '')
-                  .replace(/on\w+="[^"]*"/gi, '')
-                  .replace(/on\w+='[^']*'/gi, ''),
-              }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(comm.contentHtml) }}
             />
           ) : (
             <p className="text-primary-700 whitespace-pre-wrap leading-relaxed">{comm.content}</p>

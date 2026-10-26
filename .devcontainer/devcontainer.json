@@ -1,5 +1,10 @@
 {
   "name": "Partnership Manager",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "24.22.1"
+    }
+  },
   "forwardPorts": [3000, 5000],
   "portsAttributes": {
     "3000": {

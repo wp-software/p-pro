@@ -14,6 +14,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { Button, Card } from '@/components/ui';
+import { sanitizeHtml } from '@/utils/sanitizeHtml';
 import { contractBuilderService } from '@/services/contractService';
 
 interface Step5PreviewGenerateProps {
@@ -145,7 +146,7 @@ export const Step5PreviewGenerate: React.FC<Step5PreviewGenerateProps> = ({
           ) : htmlContent ? (
             <div
               className="text-sm text-gray-800 leading-relaxed [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mb-4 [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mb-3 [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:mb-3"
-              dangerouslySetInnerHTML={{ __html: htmlContent }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(htmlContent) }}
             />
           ) : (
             <div className="flex flex-col items-center justify-center py-16 text-gray-400">

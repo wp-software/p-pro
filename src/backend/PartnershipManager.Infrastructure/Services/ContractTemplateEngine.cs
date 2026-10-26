@@ -5,6 +5,7 @@
 
 using System.Text;
 using System.Text.RegularExpressions;
+using PartnershipManager.Application.Common.Security;
 
 namespace PartnershipManager.Infrastructure.Services;
 
@@ -317,16 +318,6 @@ footer p {
     /// <returns>Sanitized HTML</returns>
     public static string SanitizeHtml(string html)
     {
-        if (string.IsNullOrWhiteSpace(html))
-            return html;
-
-        // Basic sanitization - in production, use a library like HtmlSanitizer
-        // For now, we'll escape any script tags
-        return html
-            .Replace("<script", "&lt;script", StringComparison.OrdinalIgnoreCase)
-            .Replace("</script>", "&lt;/script&gt;", StringComparison.OrdinalIgnoreCase)
-            .Replace("javascript:", "blocked:", StringComparison.OrdinalIgnoreCase)
-            .Replace("onerror=", "data-onerror=", StringComparison.OrdinalIgnoreCase)
-            .Replace("onclick=", "data-onclick=", StringComparison.OrdinalIgnoreCase);
+        return HtmlContentSanitizer.Sanitize(html);
     }
 }

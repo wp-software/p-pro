@@ -94,8 +94,8 @@ public class AuthController : ControllerBase
         
         await _unitOfWork.Users.UpdateRefreshTokenAsync(
             user.Id, 
-            refreshToken, 
-            DateTime.UtcNow.AddDays(SystemConstants.RefreshTokenDays));
+            HashRefreshToken(refreshToken),
+            DateTime.UtcNow.AddMinutes(SystemConstants.SessionIdleTimeoutMinutes));
         
         _logger.LogInformation("Login realizado com sucesso para: {Email}", request.Email);
         
@@ -103,7 +103,7 @@ public class AuthController : ControllerBase
         {
             AccessToken = accessToken,
             RefreshToken = refreshToken,
-            ExpiresAt = DateTime.UtcNow.AddHours(SystemConstants.TokenExpirationHours),
+            ExpiresAt = DateTime.UtcNow.AddMinutes(GetAccessTokenLifetimeMinutes()),
             User = new UserInfo
             {
                 Id = user.Id,
@@ -157,7 +157,9 @@ public class AuthController : ControllerBase
         // Buscar usuário pelo refresh token
         var user = await _unitOfWork.Users.GetByRefreshTokenAsync(request.RefreshToken);
         
-        if (user == null)
+        if (user == null ||
+            user.Status != UserStatus.Active ||
+            user.IsLockedOut)
         {
             throw new UnauthorizedException(ErrorMessages.InvalidCredentials);
         }
@@ -168,11 +170,10 @@ public class AuthController : ControllerBase
         var newRefreshToken = _authService.GenerateRefreshToken();
         
         // Atualizar refresh token no banco
-        var refreshTokenExpirationDays = int.Parse(_configuration["Jwt:RefreshTokenExpirationDays"] ?? "7");
         await _unitOfWork.Users.UpdateRefreshTokenAsync(
             user.Id, 
-            newRefreshToken, 
-            DateTime.UtcNow.AddDays(refreshTokenExpirationDays));
+            HashRefreshToken(newRefreshToken),
+            DateTime.UtcNow.AddMinutes(SystemConstants.SessionIdleTimeoutMinutes));
         
         var companyId = user.CompanyId;
         var company = companyId.HasValue ? await _unitOfWork.Companies.GetByIdAsync(companyId.Value) : null;
@@ -181,8 +182,7 @@ public class AuthController : ControllerBase
         {
             AccessToken = newAccessToken,
             RefreshToken = newRefreshToken,
-            ExpiresAt = DateTime.UtcNow.AddHours(
-                int.Parse(_configuration["Jwt:ExpirationHours"] ?? "24")),
+            ExpiresAt = DateTime.UtcNow.AddMinutes(GetAccessTokenLifetimeMinutes()),
             User = new UserInfo
             {
                 Id = user.Id,
@@ -279,6 +279,7 @@ public class AuthController : ControllerBase
         
         user.ChangePassword(_authService.HashPassword(request.NewPassword));
         await _unitOfWork.Users.UpdateAsync(user);
+        await _unitOfWork.Users.UpdateRefreshTokenAsync(id, null, null);
         
         _logger.LogInformation("Senha alterada para usuário: {UserId}", id);
         
@@ -311,8 +312,7 @@ public class AuthController : ControllerBase
 
                 await _unitOfWork.Users.UpdatePasswordResetTokenAsync(user.Id, hashedToken, expiry);
 
-                var frontendUrl = (Request.Headers["Origin"].FirstOrDefault()
-                    ?? _configuration["Email:FrontendUrl"])?.TrimEnd('/') ?? "http://localhost:5173";
+                var frontendUrl = (_configuration["Email:FrontendUrl"] ?? "http://localhost:5173").TrimEnd('/');
                 var resetLink = $"{frontendUrl}/reset-password?token={Uri.EscapeDataString(plainToken)}";
 
                 await _emailService.SendPasswordResetEmailAsync(
@@ -364,6 +364,7 @@ public class AuthController : ControllerBase
         var newHash = _authService.HashPassword(request.NewPassword);
         await _unitOfWork.Users.UpdatePasswordHashAsync(user.Id, newHash);
         await _unitOfWork.Users.UpdatePasswordResetTokenAsync(user.Id, null, null);
+        await _unitOfWork.Users.UpdateRefreshTokenAsync(user.Id, null, null);
 
         _logger.LogInformation("Senha redefinida com sucesso para o usuário {UserId}", user.Id);
 
@@ -414,10 +415,55 @@ public class AuthController : ControllerBase
         return Ok(ApiResponse.Ok("Conta ativada com sucesso. Você já pode fazer login."));
     }
 
+    /// <summary>
+    /// Renova o prazo da sessão após atividade explícita do usuário.
+    /// </summary>
+    [HttpPost("activity")]
+    [Authorize]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> RecordActivity()
+    {
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!Guid.TryParse(userId, out var id))
+        {
+            throw new UnauthorizedException();
+        }
+
+        var user = await _unitOfWork.Users.GetByIdAsync(id);
+        if (user == null ||
+            user.Status != UserStatus.Active ||
+            user.IsLockedOut ||
+            string.IsNullOrWhiteSpace(user.RefreshToken) ||
+            user.RefreshTokenExpiry <= DateTime.UtcNow)
+        {
+            throw new UnauthorizedException(ErrorMessages.InvalidCredentials);
+        }
+
+        await _unitOfWork.Users.UpdateRefreshTokenAsync(
+            id,
+            user.RefreshToken,
+            DateTime.UtcNow.AddMinutes(SystemConstants.SessionIdleTimeoutMinutes));
+
+        return Ok(ApiResponse.Ok());
+    }
+
     // Gera o hash SHA-256 do token (base64 hex)
     private static string HashToken(string plainToken)
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(plainToken));
         return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
+    private static string HashRefreshToken(string plainToken)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(plainToken));
+        return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
+    private int GetAccessTokenLifetimeMinutes()
+    {
+        return int.Parse(
+            _configuration["Jwt:AccessTokenMinutes"] ??
+            SystemConstants.SessionIdleTimeoutMinutes.ToString());
     }
 }

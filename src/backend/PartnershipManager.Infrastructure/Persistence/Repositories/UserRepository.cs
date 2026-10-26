@@ -292,7 +292,15 @@ public class UserRepository : BaseRepository<User>, IUserRepository
                        AND is_deleted = 0";
         
         return await Connection.QueryFirstOrDefaultAsync<User>(sql, 
-            new { RefreshToken = refreshToken }, Transaction);
+            new { RefreshToken = HashRefreshToken(refreshToken) }, Transaction);
+    }
+
+    private static string HashRefreshToken(string refreshToken)
+    {
+        return Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(
+                    System.Text.Encoding.UTF8.GetBytes(refreshToken)))
+            .ToLowerInvariant();
     }
 
     public async Task<User?> GetByPasswordResetTokenAsync(string hashedToken)

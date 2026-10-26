@@ -87,18 +87,7 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var user = await _unitOfWork.Users.GetByIdAsync(id);
-        
-        if (user == null)
-        {
-            throw new NotFoundException("Usuário", id);
-        }
-        
-        // Verificar se pertence à mesma empresa
-        if (user.CompanyId != _currentUserService.CompanyId)
-        {
-            throw new ForbiddenException();
-        }
+        var user = await GetUserInCurrentTenantAsync(id);
         
         var roles = await _unitOfWork.UserRoles.GetRoleNamesByUserIdAsync(user.Id);
         
@@ -120,6 +109,8 @@ public class UsersController : ControllerBase
         
         var clientId = _currentUserService.ClientId
             ?? throw new UnauthorizedException();
+
+        EnsureCanAssignRole(request.InitialRole);
         
         // Verificar se email já existe
         if (await _unitOfWork.Users.EmailExistsAsync(request.Email, companyId))
@@ -159,8 +150,7 @@ public class UsersController : ControllerBase
             // Enviar e-mail de ativação (fora da transação — falha no e-mail não reverte o usuário)
             try
             {
-                var frontendUrl = (Request.Headers["Origin"].FirstOrDefault()
-                    ?? _configuration["Email:FrontendUrl"])?.TrimEnd('/') ?? "http://localhost:5173";
+                var frontendUrl = (_configuration["Email:FrontendUrl"] ?? "http://localhost:5173").TrimEnd('/');
                 var activationLink = $"{frontendUrl}/activate-account?token={Uri.EscapeDataString(plainToken)}";
                 await _emailService.SendAccountActivationEmailAsync(
                     user.Email,
@@ -196,12 +186,7 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateUserRequest request)
     {
-        var user = await _unitOfWork.Users.GetByIdAsync(id);
-        
-        if (user == null)
-        {
-            throw new NotFoundException("Usuário", id);
-        }
+        var user = await GetUserInCurrentTenantAsync(id);
         
         // Verificar permissão (próprio usuário ou admin)
         if (user.Id != _currentUserService.UserId && 
@@ -230,12 +215,7 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdatePreferences(Guid id, [FromBody] UpdateUserPreferencesRequest request)
     {
-        var user = await _unitOfWork.Users.GetByIdAsync(id);
-        
-        if (user == null)
-        {
-            throw new NotFoundException("Usuário", id);
-        }
+        var user = await GetUserInCurrentTenantAsync(id);
         
         // Apenas o próprio usuário pode alterar preferências
         if (user.Id != _currentUserService.UserId)
@@ -261,12 +241,9 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> AddRole(Guid id, [FromBody] ManageUserRoleRequest request)
     {
-        var user = await _unitOfWork.Users.GetByIdAsync(id);
-        
-        if (user == null)
-        {
-            throw new NotFoundException("Usuário", id);
-        }
+        var user = await GetUserInCurrentTenantAsync(id);
+        EnsureCanManageRolesForUser(user);
+        EnsureCanAssignRole(request.Role);
         
         // Verificar se já tem o papel
         if (await _unitOfWork.UserRoles.ExistsAsync(id, request.Role.ToString()))
@@ -298,12 +275,15 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RemoveRole(Guid id, string role)
     {
-        var user = await _unitOfWork.Users.GetByIdAsync(id);
-        
-        if (user == null)
+        var user = await GetUserInCurrentTenantAsync(id);
+        EnsureCanManageRolesForUser(user);
+
+        if (!Enum.TryParse<Role>(role, true, out var parsedRole) || !Enum.IsDefined(parsedRole))
         {
-            throw new NotFoundException("Usuário", id);
+            throw new ValidationException("Role", "Papel inválido.");
         }
+
+        EnsureCanAssignRole(parsedRole);
         
         // Verificar se tem o papel
         if (!await _unitOfWork.UserRoles.ExistsAsync(id, role))
@@ -346,12 +326,7 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ResendActivation(Guid id)
     {
-        var user = await _unitOfWork.Users.GetByIdAsync(id);
-        
-        if (user == null)
-        {
-            throw new NotFoundException("Usuário", id);
-        }
+        var user = await GetUserInCurrentTenantAsync(id);
         
         if (user.Status != Domain.Enums.UserStatus.Pending)
         {
@@ -366,8 +341,7 @@ public class UsersController : ControllerBase
         
         await _unitOfWork.Users.UpdatePasswordResetTokenAsync(user.Id, hashedToken, expiry);
         
-        var frontendUrl = (Request.Headers["Origin"].FirstOrDefault()
-            ?? _configuration["Email:FrontendUrl"])?.TrimEnd('/') ?? "http://localhost:5173";
+        var frontendUrl = (_configuration["Email:FrontendUrl"] ?? "http://localhost:5173").TrimEnd('/');
         var activationLink = $"{frontendUrl}/activate-account?token={Uri.EscapeDataString(plainToken)}";
         
         await _emailService.SendAccountActivationEmailAsync(
@@ -390,12 +364,7 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Activate(Guid id)
     {
-        var user = await _unitOfWork.Users.GetByIdAsync(id);
-        
-        if (user == null)
-        {
-            throw new NotFoundException("Usuário", id);
-        }
+        var user = await GetUserInCurrentTenantAsync(id);
         
         user.Activate();
         await _unitOfWork.Users.UpdateAsync(user);
@@ -416,12 +385,7 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Deactivate(Guid id)
     {
-        var user = await _unitOfWork.Users.GetByIdAsync(id);
-        
-        if (user == null)
-        {
-            throw new NotFoundException("Usuário", id);
-        }
+        var user = await GetUserInCurrentTenantAsync(id);
         
         // Não pode desativar a si mesmo
         if (user.Id == _currentUserService.UserId)
@@ -448,12 +412,7 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var exists = await _unitOfWork.Users.ExistsAsync(id);
-        
-        if (!exists)
-        {
-            throw new NotFoundException("Usuário", id);
-        }
+        await GetUserInCurrentTenantAsync(id);
         
         // Não pode excluir a si mesmo
         if (id == _currentUserService.UserId)
@@ -468,6 +427,66 @@ public class UsersController : ControllerBase
         _logger.LogInformation("Usuário excluído: {UserId}", id);
         
         return Ok(ApiResponse.Ok(SuccessMessages.UserDeleted));
+    }
+
+    private async Task<User> GetUserInCurrentTenantAsync(Guid id)
+    {
+        var user = await _unitOfWork.Users.GetByIdAsync(id);
+
+        if (user == null)
+        {
+            throw new NotFoundException("Usuário", id);
+        }
+
+        if (_currentUserService.Roles.Contains(Role.SuperAdmin.ToString(), StringComparer.OrdinalIgnoreCase))
+        {
+            return user;
+        }
+
+        var clientId = _currentUserService.ClientId ?? throw new UnauthorizedException();
+        var companyId = _currentUserService.CompanyId ?? throw new UnauthorizedException();
+
+        if (user.ClientId != clientId || user.CompanyId != companyId)
+        {
+            throw new ForbiddenException();
+        }
+
+        return user;
+    }
+
+    private void EnsureCanAssignRole(Role role)
+    {
+        if (!Enum.IsDefined(role))
+        {
+            throw new ValidationException("Role", "Papel inválido.");
+        }
+
+        var roles = _currentUserService.Roles.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (roles.Contains(Role.SuperAdmin.ToString()))
+        {
+            return;
+        }
+
+        if (role == Role.SuperAdmin)
+        {
+            throw new ForbiddenException();
+        }
+
+        if (roles.Contains(Role.HR.ToString()) &&
+            !roles.Contains(Role.Admin.ToString()) &&
+            role is not (Role.Employee or Role.Investor or Role.Viewer))
+        {
+            throw new ForbiddenException();
+        }
+    }
+
+    private void EnsureCanManageRolesForUser(User user)
+    {
+        if (user.Id == _currentUserService.UserId &&
+            !_currentUserService.Roles.Contains(Role.SuperAdmin.ToString(), StringComparer.OrdinalIgnoreCase))
+        {
+            throw new ForbiddenException();
+        }
     }
     
     private static UserResponse MapToResponse(User user, IEnumerable<string> roles)

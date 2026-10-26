@@ -15,6 +15,7 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
     <PackageReference Include="System.Text.Encodings.Web" Version="10.0.13" />
+    <PackageReference Include="HtmlSanitizer" Version="9.2.1039" />
   </ItemGroup>
 
   <ItemGroup>

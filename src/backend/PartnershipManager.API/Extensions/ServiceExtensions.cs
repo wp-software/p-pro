@@ -245,7 +245,8 @@ public static class ApiServiceExtensions
 {
     public static IServiceCollection AddApiServices(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IWebHostEnvironment environment)
     {
         // Controllers
         services.AddControllers()
@@ -278,13 +279,10 @@ public static class ApiServiceExtensions
                         if (corsOriginSet.Contains(origin))
                             return true;
                         
-                        // Allow any GitHub Codespaces origin
-                        if (origin.EndsWith(".app.github.dev", StringComparison.OrdinalIgnoreCase))
-                            return true;
-                        
-                        // Allow any localhost origin for development
-                        if (origin.StartsWith("http://localhost:", StringComparison.OrdinalIgnoreCase) ||
-                            origin.StartsWith("https://localhost:", StringComparison.OrdinalIgnoreCase))
+                        if (environment.IsDevelopment() &&
+                            (origin.EndsWith(".app.github.dev", StringComparison.OrdinalIgnoreCase) ||
+                             origin.StartsWith("http://localhost:", StringComparison.OrdinalIgnoreCase) ||
+                             origin.StartsWith("https://localhost:", StringComparison.OrdinalIgnoreCase)))
                             return true;
                         
                         return false;

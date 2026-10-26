@@ -16,6 +16,7 @@ import {
 } from '@/types/contract.types';
 import { contractTemplateService } from '@/services/contractService';
 import { useAuthStore } from '@/stores/authStore';
+import { sanitizeHtml } from '@/utils/sanitizeHtml';
 
 /**
  * ContractTemplatesPage
@@ -733,7 +734,7 @@ function PreviewModal({ template, onClose }: PreviewModalProps) {
         <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
           <div
             className="prose max-w-none"
-            dangerouslySetInnerHTML={{ __html: template.content }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(template.content) }}
           />
         </div>
       </div>

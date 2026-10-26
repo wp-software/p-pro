@@ -12,6 +12,7 @@ import {
 import type { DataRoomFolder } from '@/types/phase6';
 import { useConfirm } from '@/components/ui';
 import { cn } from '@/utils/cn';
+import { sanitizeUrl } from '@/utils/sanitizeHtml';
 
 interface NewFolderFormProps {
   onSubmit: (name: string) => void;
@@ -251,9 +252,9 @@ export default function DataRoomPage() {
                           <p className="text-sm font-medium text-primary truncate">{doc.name}</p>
                           <p className="text-xs text-primary-400">{doc.documentType}</p>
                         </div>
-                        {doc.downloadUrl && (
+                        {sanitizeUrl(doc.downloadUrl) && (
                           <a
-                            href={doc.downloadUrl}
+                            href={sanitizeUrl(doc.downloadUrl) ?? undefined}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-xs text-accent hover:underline shrink-0"

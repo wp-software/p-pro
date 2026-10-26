@@ -119,12 +119,12 @@ docker-compose logs -f backend    # Tail backend logs
 ## Environment Setup
 
 ### Local Development (without Docker)
-Requires: Node.js 20+, .NET SDK 9.0, MySQL 8.0, Redis
+Requires: Node.js 24.22.1+, .NET SDK 9.0, MySQL 8.0, Redis
 
 1. Copy `.env.example` to `.env` and fill in values
 2. Start MySQL and Redis locally (or via Docker)
 3. Run backend: `cd src/backend && dotnet run --project PartnershipManager.API`
-4. Run frontend: `cd src/frontend && npm install && npm run dev`
+4. Run frontend: `cd src/frontend && npm ci && npm run dev`
 
 ### Docker (Recommended)
 ```bash

@@ -30,7 +30,7 @@ public class AuthService : IAuthService
     private readonly string _jwtSecret;
     private readonly string _jwtIssuer;
     private readonly string _jwtAudience;
-    private readonly int _expirationHours;
+    private readonly int _accessTokenMinutes;
 
     public AuthService(IConfiguration configuration)
     {
@@ -38,7 +38,9 @@ public class AuthService : IAuthService
         _jwtSecret = _configuration["Jwt:Secret"] ?? throw new InvalidOperationException("JWT Secret not configured");
         _jwtIssuer = _configuration["Jwt:Issuer"] ?? "PartnershipManager";
         _jwtAudience = _configuration["Jwt:Audience"] ?? "PartnershipManagerApp";
-        _expirationHours = int.Parse(_configuration["Jwt:ExpirationHours"] ?? "24");
+        _accessTokenMinutes = int.Parse(
+            _configuration["Jwt:AccessTokenMinutes"] ??
+            SystemConstants.SessionIdleTimeoutMinutes.ToString());
     }
 
     public string HashPassword(string password)
@@ -50,10 +52,7 @@ public class AuthService : IAuthService
     {
         try
         {
-            var result = BCrypt.Net.BCrypt.Verify(password, passwordHash);
-            Console.WriteLine($"Verifying password: {password} against hash: {passwordHash}");
-            Console.WriteLine($"Password verification result: {result}");
-            return result;
+            return BCrypt.Net.BCrypt.Verify(password, passwordHash);
         }
         catch
         {
@@ -86,7 +85,7 @@ public class AuthService : IAuthService
             issuer: _jwtIssuer,
             audience: _jwtAudience,
             claims: claims,
-            expires: DateTime.UtcNow.AddHours(_expirationHours),
+            expires: DateTime.UtcNow.AddMinutes(_accessTokenMinutes),
             signingCredentials: credentials
         );
 

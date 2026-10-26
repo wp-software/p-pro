@@ -71,7 +71,7 @@ partnership-manager/
 
 ### Pré-requisitos
 - Docker e Docker Compose
-- Node.js 20+ (para desenvolvimento local)
+- Node.js 24.22.1+ (para desenvolvimento local)
 - .NET SDK 9.0 (para desenvolvimento local)
 
 ### 1. Clonar e Configurar
@@ -113,11 +113,7 @@ docker-compose logs -f api
 
 ### 4. Usuário de Demonstração
 
-```
-Email: admin@demo.com
-Senha: Admin@123
-Empresa: Demo Corp
-```
+
 
 ---
 
@@ -146,8 +142,8 @@ dotnet test
 ```bash
 cd src/frontend
 
-# Instalar dependências
-npm install
+# Instalar dependências conforme o lockfile
+npm ci
 
 # Executar em modo desenvolvimento
 npm run dev

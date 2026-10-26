@@ -2,6 +2,7 @@ import { FileText, FileImage, FileArchive, File, Trash2, ShieldCheck, Download, 
 import { Badge } from '@/components/ui';
 import { documentVisibilityLabels, documentVisibilityColors, type Document } from '@/types';
 import { formatDate } from '@/utils/format';
+import { sanitizeUrl } from '@/utils/sanitizeHtml';
 
 // ─── MIME → ícone ─────────────────────────────────────────────────────────────
 
@@ -42,6 +43,9 @@ export default function DocumentCard({
   isVerifying = false,
   isDeleting = false,
 }: DocumentCardProps) {
+  const downloadUrl = sanitizeUrl(document.downloadUrl);
+  const storageUrl = sanitizeUrl(document.storagePath);
+
   return (
     <div className="flex items-start gap-3 p-3 bg-white border border-gray-100 rounded-xl hover:border-blue-200 hover:shadow-sm transition-all">
       {/* Icon */}
@@ -73,9 +77,9 @@ export default function DocumentCard({
 
       {/* Actions */}
       <div className="flex items-center gap-1 flex-shrink-0">
-        {document.downloadUrl && (
+        {downloadUrl && (
           <a
-            href={document.downloadUrl}
+            href={downloadUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
@@ -84,9 +88,9 @@ export default function DocumentCard({
             <Download className="w-4 h-4" />
           </a>
         )}
-        {document.storagePath && !document.downloadUrl && (
+        {storageUrl && !downloadUrl && (
           <a
-            href={document.storagePath}
+            href={storageUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"

@@ -8,7 +8,7 @@ fi
 
 echo "==> Installing frontend dependencies..."
 cd "${CLAUDE_PROJECT_DIR}/src/frontend"
-npm install
+npm ci
 
 echo "==> Restoring .NET backend dependencies..."
 if command -v dotnet &>/dev/null; then

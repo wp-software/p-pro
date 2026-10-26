@@ -118,8 +118,7 @@ public class ClientsController : ControllerBase
         var activationEmailSent = false;
         try
         {
-            var frontendUrl = (Request.Headers.Origin.FirstOrDefault()
-                ?? _configuration["Email:FrontendUrl"])?.TrimEnd('/') ?? "http://localhost:5173";
+            var frontendUrl = (_configuration["Email:FrontendUrl"] ?? "http://localhost:5173").TrimEnd('/');
             var activationLink = $"{frontendUrl}/activate-account?token={Uri.EscapeDataString(activationToken)}";
             await _emailService.SendAccountActivationEmailAsync(
                 administrator.Email,
@@ -336,8 +335,7 @@ public class ClientsController : ControllerBase
         var activationEmailSent = false;
         try
         {
-            var frontendUrl = (Request.Headers.Origin.FirstOrDefault()
-                ?? _configuration["Email:FrontendUrl"])?.TrimEnd('/') ?? "http://localhost:5173";
+            var frontendUrl = (_configuration["Email:FrontendUrl"] ?? "http://localhost:5173").TrimEnd('/');
             var activationLink = $"{frontendUrl}/activate-account?token={Uri.EscapeDataString(activationToken)}";
             await _emailService.SendAccountActivationEmailAsync(
                 user.Email, user.Name, activationLink, user.Language.ToString().ToLowerInvariant());

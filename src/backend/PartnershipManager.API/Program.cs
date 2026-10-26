@@ -2,6 +2,7 @@ using Hangfire;
 using Hangfire.Dashboard;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using PartnershipManager.API.Extensions;
 using PartnershipManager.API.Middlewares;
 using PartnershipManager.Infrastructure.Jobs;
@@ -26,9 +27,14 @@ builder.Host.UseSerilog();
 // =====================================================
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpContextAccessor();
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.ForwardLimit = 1;
+});
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddApplicationServices();
-builder.Services.AddApiServices(builder.Configuration);
+builder.Services.AddApiServices(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
 
@@ -36,16 +42,21 @@ var app = builder.Build();
 // MIDDLEWARE PIPELINE
 // =====================================================
 
+app.UseForwardedHeaders();
+
 // Exception handling (primeiro da pipeline)
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-// Swagger (sempre habilitado)
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+// Expor documentação interativa apenas em desenvolvimento.
+if (app.Environment.IsDevelopment())
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "P-Pro | WP Manager API v1");
-    c.RoutePrefix = "swagger";
-});
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "P-Pro | WP Manager API v1");
+        c.RoutePrefix = "swagger";
+    });
+}
 
 // HTTPS redirection
 if (!app.Environment.IsDevelopment())
@@ -59,16 +70,26 @@ app.UseCors("DefaultPolicy");
 // Authentication & Authorization
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<SessionIdleTimeoutMiddleware>();
 
 // Client and Company Context (após autenticação)
 app.UseClientContext();
 app.UseCompanyContext();
 
-// Health Checks
+// Public readiness endpoint for platform probes; do not disclose individual checks.
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
-    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "text/plain";
+        await context.Response.WriteAsync(report.Status.ToString());
+    }
 });
+app.MapHealthChecks("/health/details", new HealthCheckOptions
+{
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+}).RequireAuthorization(policy => policy.RequireRole("Admin", "SuperAdmin"));
+app.MapGet("/health/live", () => Results.Ok(new { status = "Healthy" }));
 
 // Hangfire Dashboard - Temporarily disabled
 // app.MapHangfireDashboard("/hangfire", new DashboardOptions
@@ -88,11 +109,7 @@ app.MapControllers();
 app.MapGet("/", () => Results.Ok(new
 {
     Name = "P-Pro | WP Manager API",
-    Version = "1.0.0",
-    Status = "Running",
-    Documentation = "/swagger",
-    HealthCheck = "/health",
-    Jobs = "/hangfire"
+    Status = "Running"
 }));
 
 // =====================================================

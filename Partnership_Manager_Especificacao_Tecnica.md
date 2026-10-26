@@ -1497,7 +1497,7 @@ ENTRYPOINT ["dotnet", "PartnershipManager.Api.dll"]
 
 ```dockerfile
 # frontend/Dockerfile
-FROM node:20-alpine AS build
+FROM node:24.22.1-alpine AS build
 WORKDIR /app
 
 # Install dependencies
@@ -1509,7 +1509,7 @@ COPY . .
 RUN npm run build
 
 # Production image
-FROM node:20-alpine AS production
+FROM node:24.22.1-alpine AS production
 WORKDIR /app
 
 COPY --from=build /app/.output ./.output
@@ -1590,7 +1590,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24.22.1'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 

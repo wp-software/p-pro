@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using PartnershipManager.Application.Common.Models;
@@ -28,7 +27,6 @@ public class WorkflowService : IWorkflowService
     private readonly IUnitOfWork _uow;
     private readonly ILogger<WorkflowService> _logger;
     private readonly IConfiguration _configuration;
-    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public WorkflowService(
         IWorkflowRepository repo,
@@ -36,8 +34,7 @@ public class WorkflowService : IWorkflowService
         IEmailService emailService,
         IUnitOfWork uow,
         ILogger<WorkflowService> logger,
-        IConfiguration configuration,
-        IHttpContextAccessor httpContextAccessor)
+        IConfiguration configuration)
     {
         _repo = repo;
         _notifications = notifications;
@@ -45,15 +42,11 @@ public class WorkflowService : IWorkflowService
         _uow = uow;
         _logger = logger;
         _configuration = configuration;
-        _httpContextAccessor = httpContextAccessor;
     }
 
     private string GetFrontendUrl()
     {
-        var origin = _httpContextAccessor.HttpContext?.Request.Headers["Origin"].FirstOrDefault();
-        if (!string.IsNullOrEmpty(origin))
-            return origin.TrimEnd('/');
-        return (_configuration["Email:FrontendUrl"] ?? "http://localhost:3000").TrimEnd('/');
+        return (_configuration["Email:FrontendUrl"] ?? "http://localhost:5173").TrimEnd('/');
     }
 
     public async Task<Guid> CreateAsync(Guid companyId, CreateWorkflowRequest request, Guid requestedBy)
