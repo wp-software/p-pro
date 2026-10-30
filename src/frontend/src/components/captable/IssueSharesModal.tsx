@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { X, Plus, DollarSign } from 'lucide-react';
 import { Button, Input, Card } from '@/components/ui';
+import { ShareholderSelect } from '@/components/ui/ShareholderSelect';
 import { useIssueShares } from '@/hooks/useCapTable';
 import { useShareholders } from '@/hooks/useShareholders';
 import { useShareClassesByCompany } from '@/hooks/useShareClasses';
@@ -52,6 +53,7 @@ export default function IssueSharesModal({
     handleSubmit,
     watch,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<IssueSharesFormData>({
     resolver: zodResolver(issueSharesSchema),
@@ -71,6 +73,7 @@ export default function IssueSharesModal({
 
   const watchQuantity = watch('quantity');
   const watchPrice = watch('pricePerShare');
+  const selectedShareholderId = watch('shareholderId');
   const totalValue = (watchQuantity || 0) * (watchPrice || 0);
 
   const onSubmit = async (data: IssueSharesFormData) => {
@@ -182,18 +185,19 @@ export default function IssueSharesModal({
                   {/* Sócio */}
                   <div>
                     <label className="input-label">Sócio *</label>
-                    <select
-                      {...register('shareholderId')}
-                      className="input"
+                    <input type="hidden" {...register('shareholderId')} />
+                    <ShareholderSelect
+                      shareholders={shareholdersData?.items ?? []}
+                      value={selectedShareholderId}
+                      onChange={(shareholderId) =>
+                        setValue('shareholderId', shareholderId, {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        })
+                      }
                       disabled={loadingShareholders}
-                    >
-                      <option value="">Selecione um sócio</option>
-                      {shareholdersData?.items?.map((shareholder) => (
-                        <option key={shareholder.id} value={shareholder.id}>
-                          {shareholder.name}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder="Pesquisar sócio por nome ou email..."
+                    />
                     {errors.shareholderId && (
                       <p className="input-error-message">{errors.shareholderId.message}</p>
                     )}

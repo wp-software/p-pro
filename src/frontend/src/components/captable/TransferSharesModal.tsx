@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { X, ArrowRightLeft, DollarSign, FileText } from 'lucide-react';
 import { Button, Input, Card } from '@/components/ui';
+import { ShareholderSelect } from '@/components/ui/ShareholderSelect';
 import { useTransferShares } from '@/hooks/useCapTable';
 import { useShareholders } from '@/hooks/useShareholders';
 import { useShareClassesByCompany } from '@/hooks/useShareClasses';
@@ -55,6 +56,7 @@ export default function TransferSharesModal({
     handleSubmit,
     watch,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<TransferSharesFormData>({
     resolver: zodResolver(transferSharesSchema),
@@ -75,6 +77,7 @@ export default function TransferSharesModal({
   const watchQuantity = watch('quantity');
   const watchPrice = watch('pricePerShare');
   const watchFromShareholder = watch('fromShareholderId');
+  const watchToShareholder = watch('toShareholderId');
   const totalValue = (watchQuantity || 0) * (watchPrice || 0);
 
   const onSubmit = async (data: TransferSharesFormData) => {
@@ -111,7 +114,7 @@ export default function TransferSharesModal({
   // Filtrar sócios para o destino (excluir o de origem)
   const availableDestinations = shareholdersData?.items?.filter(
     (s) => s.id !== watchFromShareholder
-  );
+  ) ?? [];
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -142,18 +145,25 @@ export default function TransferSharesModal({
             {/* Sócio de Origem */}
             <div>
               <label className="input-label">Sócio de Origem *</label>
-              <select
-                {...register('fromShareholderId')}
-                className="input"
+              <input type="hidden" {...register('fromShareholderId')} />
+              <ShareholderSelect
+                shareholders={shareholdersData?.items ?? []}
+                value={watchFromShareholder}
+                onChange={(shareholderId) => {
+                  setValue('fromShareholderId', shareholderId, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  });
+                  if (shareholderId === watchToShareholder) {
+                    setValue('toShareholderId', '', {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+                  }
+                }}
                 disabled={loadingShareholders}
-              >
-                <option value="">Selecione o sócio de origem</option>
-                {shareholdersData?.items?.map((shareholder) => (
-                  <option key={shareholder.id} value={shareholder.id}>
-                    {shareholder.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="Pesquisar sócio de origem..."
+              />
               {errors.fromShareholderId && (
                 <p className="input-error-message">{errors.fromShareholderId.message}</p>
               )}
@@ -162,18 +172,19 @@ export default function TransferSharesModal({
             {/* Sócio de Destino */}
             <div>
               <label className="input-label">Sócio de Destino *</label>
-              <select
-                {...register('toShareholderId')}
-                className="input"
+              <input type="hidden" {...register('toShareholderId')} />
+              <ShareholderSelect
+                shareholders={availableDestinations}
+                value={watchToShareholder}
+                onChange={(shareholderId) =>
+                  setValue('toShareholderId', shareholderId, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
                 disabled={loadingShareholders || !watchFromShareholder}
-              >
-                <option value="">Selecione o sócio de destino</option>
-                {availableDestinations?.map((shareholder) => (
-                  <option key={shareholder.id} value={shareholder.id}>
-                    {shareholder.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="Pesquisar sócio de destino..."
+              />
               {errors.toShareholderId && (
                 <p className="input-error-message">{errors.toShareholderId.message}</p>
               )}
