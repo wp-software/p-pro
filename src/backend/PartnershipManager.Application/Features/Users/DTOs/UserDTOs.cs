@@ -81,5 +81,6 @@ public record UserSummaryResponse
     public string? AvatarUrl { get; init; }
     public string Status { get; init; } = string.Empty;
     public Guid? ShareholderId { get; init; }
+    public string? ShareholderName { get; init; }
     public IReadOnlyList<string> Roles { get; init; } = Array.Empty<string>();
 }

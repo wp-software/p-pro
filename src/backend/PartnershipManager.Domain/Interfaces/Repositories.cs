@@ -77,6 +77,7 @@ public interface IShareholderRepository
         string? sortDirection = null);
 
     Task<Shareholder?> GetByIdAsync(Guid id, Guid clientId);
+    Task<IReadOnlyDictionary<Guid, string>> GetNamesByIdsAsync(Guid clientId, IEnumerable<Guid> shareholderIds);
     Task<Shareholder?> GetByDocumentAsync(Guid clientId, string document);
     Task<Shareholder?> GetByEmailAsync(Guid clientId, Guid companyId, string email);
     Task<bool> DocumentExistsAsync(Guid clientId, string document, Guid? excludeId = null);

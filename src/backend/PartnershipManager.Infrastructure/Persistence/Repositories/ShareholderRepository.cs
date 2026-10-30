@@ -168,6 +168,41 @@ public class ShareholderRepository : IShareholderRepository
         return shareholder == null ? null : MapToShareholder(shareholder);
     }
 
+    public async Task<IReadOnlyDictionary<Guid, string>> GetNamesByIdsAsync(
+        Guid clientId,
+        IEnumerable<Guid> shareholderIds)
+    {
+        var ids = shareholderIds.Distinct().ToArray();
+        if (ids.Length == 0)
+        {
+            return new Dictionary<Guid, string>();
+        }
+
+        var rows = await Connection.QueryAsync<dynamic>(
+            @"SELECT id AS Id, name AS Name
+              FROM shareholders
+              WHERE client_id = @ClientId
+                AND is_deleted = 0
+                AND id IN @ShareholderIds",
+            new
+            {
+                ClientId = clientId.ToString(),
+                ShareholderIds = ids.Select(shareholderId => shareholderId.ToString()).ToArray()
+            },
+            Transaction);
+
+        var shareholderNames = new Dictionary<Guid, string>();
+        foreach (var row in rows)
+        {
+            var shareholderId = row.Id is Guid id
+                ? id
+                : Guid.Parse((string)row.Id);
+            shareholderNames.Add(shareholderId, (string)row.Name);
+        }
+
+        return shareholderNames;
+    }
+
     public async Task<Shareholder?> GetByDocumentAsync(Guid clientId, string document)
     {
         var normalized = new string(document.Where(char.IsDigit).ToArray());

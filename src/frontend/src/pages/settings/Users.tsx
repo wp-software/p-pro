@@ -90,6 +90,9 @@ export default function Users() {
                   Papéis
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-primary-600">
+                  Sócio vinculado
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-primary-600">
                   Status
                 </th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-primary-600">
@@ -100,13 +103,13 @@ export default function Users() {
             <tbody className="divide-y divide-primary-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-primary-500">
+                  <td colSpan={6} className="px-4 py-8 text-center text-primary-500">
                     Carregando...
                   </td>
                 </tr>
               ) : data?.items.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-primary-500">
+                  <td colSpan={6} className="px-4 py-8 text-center text-primary-500">
                     Nenhum usuário encontrado
                   </td>
                 </tr>
@@ -132,6 +135,9 @@ export default function Users() {
                           </Badge>
                         ))}
                       </div>
+                    </td>
+                    <td className="px-4 py-3 text-primary-600">
+                      {user.shareholderName ?? '—'}
                     </td>
                     <td className="px-4 py-3">{getStatusBadge(user.status)}</td>
                     <td className="px-4 py-3">

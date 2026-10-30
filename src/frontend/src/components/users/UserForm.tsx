@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -59,10 +60,18 @@ export function UserForm({ user, onClose }: UserFormProps) {
   const updateUser = useUpdateUser();
   const companyId = useAuthStore((state) => state.user?.companyId);
   const { data: shareholders = [], isLoading: loadingShareholders } = useAllShareholders(companyId);
+  const [shareholderSearch, setShareholderSearch] = useState('');
+  const [isShareholderListOpen, setIsShareholderListOpen] = useState(false);
+  const sortedShareholders = useMemo(
+    () => [...shareholders].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' })),
+    [shareholders],
+  );
 
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<CreateUserForm | UpdateUserForm>({
     resolver: zodResolver(isEditing ? updateUserSchema : createUserSchema),
@@ -70,6 +79,17 @@ export function UserForm({ user, onClose }: UserFormProps) {
       ? { name: user.name, shareholderId: user.shareholderId ?? '' }
       : { initialRole: 'Viewer', shareholderId: '' },
   });
+  const selectedShareholderId = watch('shareholderId');
+  const selectedShareholder = shareholders.find(
+    (shareholder) => shareholder.id === selectedShareholderId,
+  );
+  const normalizeSearch = (value: string) =>
+    value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+  const filteredShareholders = sortedShareholders.filter((shareholder) =>
+    normalizeSearch(`${shareholder.name} ${shareholder.email ?? ''}`).includes(
+      normalizeSearch(shareholderSearch.trim()),
+    ),
+  );
 
   const onSubmit = async (data: CreateUserForm | UpdateUserForm) => {
     try {
@@ -158,19 +178,93 @@ export function UserForm({ user, onClose }: UserFormProps) {
 
           <div>
             <label className="input-label">Sócio vinculado</label>
-            <select
-              className="input"
-              disabled={loadingShareholders}
-              {...register('shareholderId')}
-            >
-              <option value="">Nenhum</option>
-              {shareholders.map((shareholder) => (
-                <option key={shareholder.id} value={shareholder.id}>
-                  {shareholder.name}
-                  {shareholder.email ? ` (${shareholder.email})` : ''}
-                </option>
-              ))}
-            </select>
+            <input type="hidden" {...register('shareholderId')} />
+            <div className="relative">
+              {isShareholderListOpen ? (
+                <div className="absolute z-10 w-full rounded-md border border-primary-200 bg-white shadow-lg">
+                  <input
+                    autoFocus
+                    type="search"
+                    role="combobox"
+                    aria-label="Pesquisar sócio"
+                    aria-expanded="true"
+                    aria-controls="shareholder-options"
+                    aria-autocomplete="list"
+                    placeholder="Pesquisar sócio por nome ou email..."
+                    className="input rounded-b-none"
+                    disabled={loadingShareholders}
+                    value={shareholderSearch}
+                    onChange={(event) => setShareholderSearch(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') {
+                        setIsShareholderListOpen(false);
+                        setShareholderSearch('');
+                      }
+                    }}
+                  />
+                  <div
+                    id="shareholder-options"
+                    role="listbox"
+                    aria-label="Sócios"
+                    className="max-h-48 overflow-y-auto py-1"
+                  >
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={!selectedShareholderId}
+                      className="w-full px-3 py-2 text-left text-sm text-primary-600 hover:bg-primary-50"
+                      onClick={() => {
+                        setValue('shareholderId', '', { shouldDirty: true });
+                        setIsShareholderListOpen(false);
+                        setShareholderSearch('');
+                      }}
+                    >
+                      Nenhum
+                    </button>
+                    {filteredShareholders.map((shareholder) => (
+                      <button
+                        key={shareholder.id}
+                        type="button"
+                        role="option"
+                        aria-selected={shareholder.id === selectedShareholderId}
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-primary-50"
+                        onClick={() => {
+                          setValue('shareholderId', shareholder.id, { shouldDirty: true });
+                          setIsShareholderListOpen(false);
+                          setShareholderSearch('');
+                        }}
+                      >
+                        <span className="block text-primary">{shareholder.name}</span>
+                        {shareholder.email && (
+                          <span className="block text-xs text-primary-500">{shareholder.email}</span>
+                        )}
+                      </button>
+                    ))}
+                    {!loadingShareholders && filteredShareholders.length === 0 && (
+                      <p className="px-3 py-2 text-sm text-primary-500">
+                        Nenhum sócio encontrado
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="input w-full text-left"
+                  disabled={loadingShareholders}
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  onClick={() => {
+                    setShareholderSearch('');
+                    setIsShareholderListOpen(true);
+                  }}
+                >
+                  {loadingShareholders
+                    ? 'Carregando sócios...'
+                    : selectedShareholder?.name ?? 'Pesquisar e selecionar sócio'}
+                </button>
+              )}
+            </div>
             <p className="text-xs text-primary-500 mt-1">
               Define de quais dados de sócio (participação e vesting) este usuário pode ver.
             </p>

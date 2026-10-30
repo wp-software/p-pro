@@ -69,12 +69,28 @@ public class UsersController : ControllerBase
         
         var (users, total) = await _unitOfWork.Users.GetPagedByCompanyAsync(
             companyId, page, pageSize, search);
-        
+
+        var userItems = users.ToList();
+        var shareholderIds = userItems
+            .Where(user => user.ShareholderId.HasValue)
+            .Select(user => user.ShareholderId.GetValueOrDefault())
+            .Distinct()
+            .ToArray();
+        var shareholderNames = shareholderIds.Length > 0
+            ? await _shareholderRepository.GetNamesByIdsAsync(
+                _currentUserService.ClientId ?? throw new UnauthorizedException(),
+                shareholderIds)
+            : new Dictionary<Guid, string>();
+
         var items = new List<UserSummaryResponse>();
-        foreach (var user in users)
+        foreach (var user in userItems)
         {
             var roles = await _unitOfWork.UserRoles.GetRoleNamesByUserIdAsync(user.Id);
-            items.Add(MapToSummary(user, roles));
+            var shareholderName = user.ShareholderId is Guid shareholderId &&
+                                  shareholderNames.TryGetValue(shareholderId, out var name)
+                ? name
+                : null;
+            items.Add(MapToSummary(user, roles, shareholderName));
         }
         
         var pagedResult = new PagedResult<UserSummaryResponse>(items, total, page, pageSize);
@@ -555,7 +571,10 @@ public class UsersController : ControllerBase
         };
     }
     
-    private static UserSummaryResponse MapToSummary(User user, IEnumerable<string> roles)
+    private static UserSummaryResponse MapToSummary(
+        User user,
+        IEnumerable<string> roles,
+        string? shareholderName = null)
     {
         return new UserSummaryResponse
         {
@@ -565,6 +584,7 @@ public class UsersController : ControllerBase
             AvatarUrl = user.AvatarUrl,
             Status = user.Status.ToString(),
             ShareholderId = user.ShareholderId,
+            ShareholderName = shareholderName,
             Roles = roles.ToList()
         };
     }

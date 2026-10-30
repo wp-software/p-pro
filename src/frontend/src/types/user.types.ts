@@ -25,6 +25,7 @@ export interface UserSummary {
   avatarUrl?: string;
   status: string;
   shareholderId?: string | null;
+  shareholderName?: string | null;
   roles: string[];
 }
 
