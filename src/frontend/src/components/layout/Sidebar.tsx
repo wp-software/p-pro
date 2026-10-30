@@ -24,6 +24,7 @@ import {
   MessageSquare,
   Bell,
   FolderOpen,
+  LayoutTemplate,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { cn } from '@/utils/cn';
@@ -107,6 +108,8 @@ const navGroups: NavGroup[] = [
     icon: CheckSquare,
     items: [
       { nameKey: 'nav.flows', href: '/approvals/flows', icon: List },
+      { nameKey: 'nav.flowTemplates', href: '/approvals/templates', icon: LayoutTemplate },
+      { nameKey: 'nav.approvalGroups', href: '/approvals/groups', icon: Users },
       { nameKey: 'nav.approvers', href: '/approvals/approvers', icon: UserCheck },
       { nameKey: 'nav.approvalsNav', href: '/approvals', icon: CheckSquare },
     ],

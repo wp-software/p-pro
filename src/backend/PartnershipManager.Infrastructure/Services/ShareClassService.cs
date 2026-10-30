@@ -44,6 +44,12 @@ public class ShareClassService : IShareClassService
 
     public async Task<IEnumerable<ShareClassSummaryResponse>> GetByCompanyAsync(Guid clientId, Guid companyId)
     {
+        var company = await _companyRepository.GetByIdAsync(companyId);
+        if (company == null || company.ClientId != clientId)
+        {
+            throw new NotFoundException("Company", companyId);
+        }
+
         var items = await _shareClassRepository.GetByCompanyAsync(clientId, companyId);
         return items.Select(sc => new ShareClassSummaryResponse
         {
@@ -68,25 +74,16 @@ public class ShareClassService : IShareClassService
 
     public async Task<ShareClassResponse> CreateAsync(Guid clientId, CreateShareClassRequest request, Guid? userId = null)
     {
-        // Validate company belongs to client
-        var company = await _companyRepository.GetByIdAsync(request.CompanyId);
-        if (company == null || company.ClientId != clientId)
-        {
-            throw new NotFoundException("Company", request.CompanyId);
-        }
-
-        // Validate code uniqueness
-        var codeExists = await _shareClassRepository.CodeExistsAsync(clientId, request.CompanyId, request.Code);
+        var codeExists = await _shareClassRepository.CodeExistsAsync(clientId, null, request.Code);
         if (codeExists)
         {
-            throw new ConflictException($"Já existe uma classe de ações com o código '{request.Code}' nesta empresa");
+            throw new ConflictException($"Já existe uma classe de ações com o código '{request.Code}' neste tenant");
         }
 
-        // Validate conversion target exists
         if (request.IsConvertible && request.ConvertsToClassId.HasValue)
         {
-            var targetExists = await _shareClassRepository.ExistsAsync(request.ConvertsToClassId.Value, clientId);
-            if (!targetExists)
+            var target = await _shareClassRepository.GetByIdAsync(request.ConvertsToClassId.Value, clientId);
+            if (target == null || target.CompanyId.HasValue)
             {
                 throw new NotFoundException("Classe de destino para conversão", request.ConvertsToClassId.Value);
             }
@@ -94,7 +91,7 @@ public class ShareClassService : IShareClassService
 
         var shareClass = ShareClass.Create(
             clientId,
-            request.CompanyId,
+            null,
             request.Name,
             request.Code,
             request.Description,
@@ -126,11 +123,12 @@ public class ShareClassService : IShareClassService
             throw new NotFoundException("ShareClass", id);
         }
 
-        // Validate code uniqueness (excluding current)
+        // A tenant-wide class and a company-specific legacy class use separate code scopes.
         var codeExists = await _shareClassRepository.CodeExistsAsync(clientId, shareClass.CompanyId, request.Code, id);
         if (codeExists)
         {
-            throw new ConflictException($"Já existe outra classe de ações com o código '{request.Code}' nesta empresa");
+            var scope = shareClass.CompanyId.HasValue ? "nesta empresa" : "neste tenant";
+            throw new ConflictException($"Já existe outra classe de ações com o código '{request.Code}' {scope}");
         }
 
         // Validate conversion target exists
@@ -141,8 +139,9 @@ public class ShareClassService : IShareClassService
                 throw new BusinessException("Uma classe de ações não pode converter para si mesma");
             }
 
-            var targetExists = await _shareClassRepository.ExistsAsync(request.ConvertsToClassId.Value, clientId);
-            if (!targetExists)
+            var target = await _shareClassRepository.GetByIdAsync(request.ConvertsToClassId.Value, clientId);
+            if (target == null ||
+                (target.CompanyId.HasValue && target.CompanyId != shareClass.CompanyId))
             {
                 throw new NotFoundException("Classe de destino para conversão", request.ConvertsToClassId.Value);
             }
@@ -197,7 +196,7 @@ public class ShareClassService : IShareClassService
             Id = shareClass.Id,
             ClientId = shareClass.ClientId,
             CompanyId = shareClass.CompanyId,
-            CompanyName = shareClass.CompanyName ?? string.Empty,
+            CompanyName = shareClass.CompanyName,
             Name = shareClass.Name,
             Code = shareClass.Code,
             Description = shareClass.Description,

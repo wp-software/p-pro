@@ -176,6 +176,21 @@ export const shareholderTypeLabels: Record<ShareholderType, string> = {
   [ShareholderType.Other]: 'Outro',
 };
 
+const shareholderTypeValuesByName: Record<string, ShareholderType> = {
+  Founder: ShareholderType.Founder,
+  Investor: ShareholderType.Investor,
+  Employee: ShareholderType.Employee,
+  Advisor: ShareholderType.Advisor,
+  ESOP: ShareholderType.ESOP,
+  Partner: ShareholderType.Partner,
+  Other: ShareholderType.Other,
+};
+
+export const getShareholderTypeLabel = (type: ShareholderType | string): string => {
+  const typeValue = shareholderTypeValuesByName[String(type)];
+  return typeValue === undefined ? String(type) : shareholderTypeLabels[typeValue];
+};
+
 export const shareholderStatusLabels: Record<ShareholderStatus, string> = {
   [ShareholderStatus.Active]: 'Ativo',
   [ShareholderStatus.Inactive]: 'Inativo',

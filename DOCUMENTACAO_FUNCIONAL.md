@@ -494,7 +494,7 @@ Armazenadas em JSON:
 
 #### Visão Geral
 
-O módulo Cap Table permite gerenciar toda a estrutura societária das empresas, incluindo sócios, classes de ações, participações e transações. Também oferece simulação de rodadas de investimento.
+O módulo Cap Table permite gerenciar toda a estrutura societária das empresas, incluindo sócios, classes de ações, participações e transações. As classes de ações cadastradas no tenant são compartilhadas por todas as suas empresas; classes antigas vinculadas a uma empresa continuam disponíveis apenas nela e prevalecem sobre uma classe compartilhada de mesmo código. Também oferece simulação de rodadas de investimento.
 
 #### Funcionalidades
 

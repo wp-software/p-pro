@@ -4,6 +4,8 @@
 
 Este manual descreve todas as rotinas do sistema, para que cada perfil de usuário compreenda exatamente o que cada tela faz, quando utilizá-la e qual problema ela resolve.
 
+**Atualizado em:** 28 de outubro de 2026
+
 ---
 
 ## Sumário
@@ -37,6 +39,8 @@ Este manual descreve todas as rotinas do sistema, para que cada perfil de usuár
    - 7.1 [Fluxos de Aprovação](#71-fluxos-de-aprovação)
    - 7.2 [Aprovadores](#72-aprovadores)
    - 7.3 [Aprovações](#73-aprovações)
+   - 7.4 [Grupos de Aprovação](#74-grupos-de-aprovação)
+   - 7.5 [Modelos de Fluxo](#75-modelos-de-fluxo)
 8. [Administração](#8-administração)
    - 8.1 [Usuários](#81-usuários)
    - 8.2 [Perfis de Acesso](#82-perfis-de-acesso)
@@ -557,20 +561,21 @@ O módulo de Aprovações implementa processos formais de revisão e autorizaç�
 
 **Rota:** `/approvals/flows`
 
-**Resumo:** Criação e configuração de fluxos de aprovação multi-etapas para processos formais da empresa.
+**Resumo:** Criação, configuração e acompanhamento de fluxos de aprovação com etapas sequenciais.
 
-Um Fluxo de Aprovação define a sequência de passos que um documento ou decisão deve percorrer antes de ser considerado aprovado. Esta tela é onde os administradores modelam esses fluxos, definindo quem aprova o quê e em qual ordem.
+Um fluxo registra uma solicitação e o caminho de revisão ou aprovação que ela precisa percorrer. Na listagem, é possível pesquisar pelo título, filtrar por tipo e status, consultar o progresso e abrir os detalhes do fluxo. A criação começa em **Novo fluxo**.
 
-**Estrutura de um fluxo:**
-- **Etapas sequenciais:** cada fluxo é composto por uma ou mais etapas que ocorrem em ordem. Somente após a aprovação de uma etapa o fluxo avança para a próxima.
-- **Tipo por etapa:** cada etapa pode ser classificada como `Aprovação` (requer decisão ativa), `Revisão` (verificação sem aprovação formal), `Notificação` (apenas informa sem exigir ação) ou `Automático` (processamento sem intervenção humana).
-- **Responsável por papel:** em vez de fixar um usuário específico, cada etapa é atribuída a um papel (Admin, Legal, Finance, BoardMember), garantindo que o fluxo funcione mesmo com mudança de pessoas.
-- **Prazo por etapa:** cada etapa tem um SLA individual. O prazo total do fluxo é calculado automaticamente pela soma das etapas.
-- **Filtros e categorização:** organizar fluxos por tipo (emissão de ações, contrato, distribuição, comunicado), status e prioridade.
+**Dados do fluxo:**
+- **Identificação:** título obrigatório, tipo, prioridade e descrição opcional. Os tipos disponíveis incluem aprovação de contrato, alteração societária, aprovação de comunicação, verificação de documento e aprovação de vesting.
+- **Etapas:** cada etapa tem nome e tipo: `Aprovação`, `Revisão`, `Notificação` ou `Automática`.
+- **Responsáveis:** uma etapa pode ser atribuída a um perfil, a um usuário específico ou a um grupo de aprovação. Para grupos, a etapa pode usar a regra padrão do grupo ou sobrescrevê-la.
+- **Prazos:** cada etapa pode não ter prazo ou usar dias corridos ou dias úteis. O sistema apresenta uma previsão por etapa e calcula a data final do fluxo com base nos prazos configurados.
+- **Prioridade e status:** os fluxos podem ser acompanhados por prioridade e status; a listagem oferece filtros e paginação.
+- **Modelos reutilizáveis:** durante a criação, é possível salvar a configuração como modelo para uso posterior (seção 7.5).
 
 **Quando usar:** ao formalizar o processo de aprovação para emissão de novas ações, ao criar um fluxo para contratos acima de determinado valor, ou ao definir o processo de aprovação para comunicados enviados a investidores.
 
-> **Perfis que utilizam:** Admin (criação e gestão).
+> **Perfis que utilizam:** usuários autenticados com acesso ao módulo; as ações de cada etapa dependem do responsável configurado e das permissões do usuário.
 
 ![Fluxos de Aprovação](prints/21_aprovacoes_fluxos.png)
 
@@ -580,19 +585,18 @@ Um Fluxo de Aprovação define a sequência de passos que um documento ou decis�
 
 **Rota:** `/approvals/approvers`
 
-**Resumo:** Gerenciamento de quais usuários possuem papel de aprovador e em quais grupos de decisão atuam.
+**Resumo:** Consulta e gerenciamento dos papéis dos usuários que podem atuar como aprovadores.
 
-Esta tela responde à pergunta: "quem é responsável por aprovar o quê no sistema?". Ela organiza os usuários aprovadores por papel, tornando transparente quem está alocado em cada grupo de decisão e permitindo ajustes quando há mudança de equipe.
+Esta tela lista os usuários e seus papéis de aprovação. Os cartões de papel permitem filtrar a lista; também é possível pesquisar por nome ou e-mail. A opção de gerenciar papéis abre as ações para adicionar ou remover papéis do usuário. Grupos de aprovadores são configurados separadamente, na seção 7.4.
 
 **Funcionalidades disponíveis:**
-- **Resumo por papel:** visão consolidada de quantos aprovadores existem em cada papel (Admin, Legal, Finance, BoardMember), com nomes e status.
-- **Adicionar aprovador:** conceder a um usuário existente a responsabilidade de aprovação em um determinado papel — útil ao promover alguém para uma função de decisão.
-- **Remover aprovador:** revogar a função de aprovação de um usuário sem precisar alterar todos os fluxos que referenciam aquele papel.
-- **Verificação de cobertura:** identificar papéis sem aprovadores ativos, o que poderia travar fluxos em andamento.
+- **Resumo e filtro por papel:** consultar usuários com os papéis `Admin`, `Founder`, `BoardMember`, `Legal` e `Finance`.
+- **Pesquisa:** localizar usuários por nome ou e-mail e filtrar a lista por papel.
+- **Gerenciar papéis:** adicionar ou remover papéis do usuário selecionado. A alteração pode afetar as permissões desse usuário em outros módulos.
 
 **Quando usar:** ao integrar um novo membro ao conselho (BoardMember), ao designar um novo responsável jurídico (Legal), ao reorganizar a equipe financeira, ou ao auditar quem tem poder de aprovação no sistema.
 
-> **Perfis que utilizam:** Admin, SuperAdmin.
+> **Perfis que utilizam:** usuários com permissão para consultar e gerenciar usuários e papéis.
 
 ![Aprovadores](prints/22_aprovacoes_aprovadores.png)
 
@@ -602,28 +606,66 @@ Esta tela responde à pergunta: "quem é responsável por aprovar o quê no sist
 
 **Rota:** `/approvals`
 
-**Resumo:** Fila de aprovações pendentes e visão completa do andamento de todos os fluxos ativos.
+**Resumo:** Fila de trabalho para consultar os fluxos e identificar as aprovações pendentes para o usuário.
 
-Esta é a tela operacional do módulo de Aprovações — onde os aprovadores executam suas ações (aprovar, rejeitar, solicitar alteração) e onde qualquer usuário pode acompanhar o status dos fluxos que envolvem seus documentos ou solicitações.
+As abas organizam os fluxos em **Pendentes para mim**, **Em andamento**, **Concluídas** e **Todos**. Selecione um cartão para abrir o fluxo, consultar as etapas, o progresso e o histórico de decisões. As ações disponíveis dependem de o usuário ser responsável pela etapa atual.
 
-**Organização em abas:**
-- **Pendentes para mim:** aprovações que requerem ação imediata do usuário logado, ordenadas por prazo de vencimento.
-- **Em andamento:** fluxos que estão ativos e em alguma etapa intermediária, aguardando outros aprovadores.
-- **Aprovados:** histórico de fluxos concluídos com aprovação.
-- **Rejeitados:** fluxos que foram negados em alguma etapa, com o motivo registrado.
-- **Todos:** visão completa de todos os fluxos, independente de status (disponível para Admin).
-
-**Ações disponíveis por aprovação:**
-- **Aprovar:** confirmar a etapa, avançando o fluxo para a próxima etapa ou concluindo o processo.
-- **Rejeitar:** negar a solicitação, com campo obrigatório para justificativa que fica registrada no histórico.
-- **Solicitar alteração:** devolver o fluxo para o solicitante com comentários específicos sobre o que precisa ser corrigido.
-- **Comentar:** adicionar observações ao fluxo sem tomar uma decisão definitiva.
+**Ações e acompanhamento:**
+- **Aprovar etapa:** confirma a decisão e registra comentários opcionais.
+- **Rejeitar etapa:** exige o preenchimento do motivo, que passa a constar no histórico.
+- **Grupos:** nas etapas atribuídas a grupos, a tela indica a regra de aprovação e as decisões já registradas por cada membro.
+- **Cancelar fluxo:** fluxos pendentes ou em andamento podem ser cancelados com a informação de um motivo.
+- **Status e prioridade:** os detalhes exibem o status, a prioridade, o prazo total quando configurado e a linha do tempo das etapas.
 
 **Quando usar:** diariamente, ao receber uma notificação de aprovação pendente; ou ao acompanhar o status de uma solicitação que o próprio usuário submeteu para aprovação.
 
-> **Perfis que utilizam:** todos os usuários com papel de aprovador (ação); todos os usuários (acompanhamento dos próprios fluxos).
+> **Perfis que utilizam:** usuários autenticados; aprovar ou rejeitar depende de serem responsáveis pela etapa atual e ainda não terem registrado uma decisão nela.
 
 ![Aprovações](prints/23_aprovacoes.png)
+
+---
+
+### 7.4 Grupos de Aprovação
+
+**Rota:** `/approvals/groups`
+
+**Resumo:** Cadastro de grupos reutilizáveis de usuários para atribuição coletiva em etapas de fluxos.
+
+Um grupo reúne usuários ativos que participam de uma decisão. Ao criar ou editar um grupo, informe um nome, opcionalmente uma descrição, selecione pelo menos um membro e escolha a regra padrão de aprovação.
+
+**Regras disponíveis:**
+- **Qualquer um dos membros:** a etapa avança assim que um membro aprovar.
+- **Todos os membros:** a etapa avança somente depois que todos os membros aprovarem.
+- **Rejeição:** a rejeição de um membro encerra o fluxo, independentemente da regra escolhida.
+- **Ativação:** grupos inativos não ficam disponíveis para novos fluxos. A regra padrão pode ser substituída em uma etapa específica ao configurar o fluxo.
+
+É possível pesquisar usuários ao selecionar membros, editar grupos existentes e removê-los. Antes de remover um grupo, considere que modelos de fluxo que o utilizam podem ficar sem aprovador.
+
+**Quando usar:** quando a decisão deve ser atribuída a uma equipe — por exemplo, um conselho ou um grupo jurídico e financeiro — em vez de depender de um único usuário ou perfil.
+
+> **Perfis que utilizam:** usuários com permissão de gestão; a API restringe criação, edição e remoção aos papéis `SuperAdmin`, `Admin` e `Founder`.
+
+---
+
+### 7.5 Modelos de Fluxo
+
+**Rota:** `/approvals/templates`
+
+**Resumo:** Biblioteca de configurações de fluxo para reutilizar etapas e responsáveis em novas solicitações.
+
+Um modelo guarda o nome, a descrição, o tipo, a prioridade e as etapas de um fluxo. Os modelos são criados durante **Novo fluxo**, marcando **Salvar este fluxo como modelo reutilizável** e informando o nome do modelo.
+
+**Como reutilizar:**
+1. Abra **Modelos** na tela de Fluxos de Aprovação.
+2. Confira o tipo, a prioridade, as etapas e os responsáveis apresentados no cartão.
+3. Selecione **Usar modelo**. O formulário de novo fluxo será aberto com a configuração preenchida.
+4. Revise e ajuste as informações necessárias antes de criar o novo fluxo.
+
+É possível remover um modelo. A remoção não altera fluxos que já foram criados a partir dele. Se um modelo referenciar um grupo removido, revise a atribuição da etapa antes de usar o modelo.
+
+**Quando usar:** quando um processo recorrente precisa manter uma estrutura consistente sem recriar manualmente suas etapas a cada solicitação.
+
+> **Perfis que utilizam:** usuários autenticados com acesso ao módulo de fluxos.
 
 ---
 
@@ -788,4 +830,4 @@ No vesting por milestone (evento), a aquisição das cotas não ocorre pelo pass
 
 ---
 
-*Documento atualizado em março de 2026.*
+*Documento atualizado em 28 de outubro de 2026.*

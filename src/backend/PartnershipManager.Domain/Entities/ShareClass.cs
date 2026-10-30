@@ -8,7 +8,7 @@ namespace PartnershipManager.Domain.Entities;
 public class ShareClass : BaseEntity
 {
     public Guid ClientId { get; private set; }
-    public Guid CompanyId { get; private set; }
+    public Guid? CompanyId { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public string Code { get; private set; } = string.Empty;
     public string? Description { get; private set; }
@@ -45,7 +45,7 @@ public class ShareClass : BaseEntity
 
     public static ShareClass Create(
         Guid clientId,
-        Guid companyId,
+        Guid? companyId,
         string name,
         string code,
         string? description = null,

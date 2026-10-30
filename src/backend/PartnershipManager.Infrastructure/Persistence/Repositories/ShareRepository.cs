@@ -24,6 +24,7 @@ public class ShareRepository : IShareRepository
         s.client_id AS ClientId,
         s.company_id AS CompanyId,
         s.shareholder_id AS ShareholderId,
+        COALESCE(shc.type, sh.type) AS ShareholderType,
         s.share_class_id AS ShareClassId,
         s.certificate_number AS CertificateNumber,
         s.quantity AS Quantity,
@@ -55,6 +56,8 @@ public class ShareRepository : IShareRepository
     {
         var baseQuery = new StringBuilder(@"FROM shares s
                     JOIN shareholders sh ON sh.id = s.shareholder_id
+                    LEFT JOIN shareholder_companies shc
+                        ON shc.shareholder_id = sh.id AND shc.company_id = s.company_id
                     JOIN share_classes sc ON sc.id = s.share_class_id
                     JOIN companies c ON c.id = s.company_id
                     WHERE s.is_deleted = 0
@@ -116,6 +119,8 @@ public class ShareRepository : IShareRepository
         var sql = $@"SELECT {SelectColumns}
                     FROM shares s
                     JOIN shareholders sh ON sh.id = s.shareholder_id
+                    LEFT JOIN shareholder_companies shc
+                        ON shc.shareholder_id = sh.id AND shc.company_id = s.company_id
                     JOIN share_classes sc ON sc.id = s.share_class_id
                     JOIN companies c ON c.id = s.company_id
                     WHERE s.client_id = @ClientId
@@ -138,6 +143,8 @@ public class ShareRepository : IShareRepository
         var sql = $@"SELECT {SelectColumns}
                     FROM shares s
                     JOIN shareholders sh ON sh.id = s.shareholder_id
+                    LEFT JOIN shareholder_companies shc
+                        ON shc.shareholder_id = sh.id AND shc.company_id = s.company_id
                     JOIN share_classes sc ON sc.id = s.share_class_id
                     JOIN companies c ON c.id = s.company_id
                     WHERE s.client_id = @ClientId
@@ -160,6 +167,8 @@ public class ShareRepository : IShareRepository
         var sql = $@"SELECT {SelectColumns}
                     FROM shares s
                     JOIN shareholders sh ON sh.id = s.shareholder_id
+                    LEFT JOIN shareholder_companies shc
+                        ON shc.shareholder_id = sh.id AND shc.company_id = s.company_id
                     JOIN share_classes sc ON sc.id = s.share_class_id
                     JOIN companies c ON c.id = s.company_id
                     WHERE s.client_id = @ClientId
@@ -182,6 +191,8 @@ public class ShareRepository : IShareRepository
         var sql = $@"SELECT {SelectColumns}
                     FROM shares s
                     JOIN shareholders sh ON sh.id = s.shareholder_id
+                    LEFT JOIN shareholder_companies shc
+                        ON shc.shareholder_id = sh.id AND shc.company_id = s.company_id
                     JOIN share_classes sc ON sc.id = s.share_class_id
                     JOIN companies c ON c.id = s.company_id
                     WHERE s.id = @Id AND s.client_id = @ClientId AND s.is_deleted = 0";
@@ -365,6 +376,7 @@ public class ShareRepository : IShareRepository
         SetProperty(share, "UpdatedBy", row.UpdatedBy != null ? ParseGuid(row.UpdatedBy) : null);
         SetProperty(share, "IsDeleted", ParseBool(row.IsDeleted));
         SetProperty(share, "DeletedAt", row.DeletedAt);
+        SetProperty(share, "ShareholderType", Enum.Parse<ShareholderType>(row.ShareholderType.ToString(), true));
         
         // Navigation properties
         SetProperty(share, "ShareholderName", row.ShareholderName);

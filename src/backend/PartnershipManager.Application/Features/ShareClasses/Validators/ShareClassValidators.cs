@@ -7,10 +7,6 @@ public class CreateShareClassValidator : AbstractValidator<CreateShareClassReque
 {
     public CreateShareClassValidator()
     {
-        RuleFor(x => x.CompanyId)
-            .NotEmpty()
-            .WithMessage("ID da empresa é obrigatório");
-
         RuleFor(x => x.Name)
             .NotEmpty()
             .WithMessage("Nome da classe é obrigatório")

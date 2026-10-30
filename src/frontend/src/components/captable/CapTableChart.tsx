@@ -1,6 +1,6 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { Card } from '@/components/ui';
-import { CapTable } from '@/types';
+import { CapTable, getShareholderTypeLabel } from '@/types';
 import { formatCurrency, formatPercentage } from '@/utils/format';
 
 // Paleta de cores para o gráfico
@@ -161,10 +161,5 @@ export function CapTableChart({
 }
 
 function getTypeName(type: string): string {
-  const typeNames: Record<string, string> = {
-    Individual: 'Pessoa Física',
-    Company: 'Pessoa Jurídica',
-    InvestmentFund: 'Fundo de Investimento',
-  };
-  return typeNames[type] || type;
+  return getShareholderTypeLabel(type);
 }

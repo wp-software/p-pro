@@ -119,7 +119,7 @@ public interface IShareClassRepository
     Task<IEnumerable<ShareClass>> GetByCompanyAsync(Guid clientId, Guid companyId);
     Task<ShareClass?> GetByIdAsync(Guid id, Guid clientId);
     Task<ShareClass?> GetByCodeAsync(Guid clientId, Guid companyId, string code);
-    Task<bool> CodeExistsAsync(Guid clientId, Guid companyId, string code, Guid? excludeId = null);
+    Task<bool> CodeExistsAsync(Guid clientId, Guid? companyId, string code, Guid? excludeId = null);
     Task AddAsync(ShareClass shareClass);
     Task UpdateAsync(ShareClass shareClass);
     Task SoftDeleteAsync(Guid id, Guid clientId, Guid? deletedBy = null);
@@ -820,4 +820,22 @@ public interface IWorkflowRepository
     Task CompleteWorkflowAsync(Guid workflowId, string finalStatus);
     Task CancelWorkflowAsync(Guid workflowId, Guid cancelledBy, string reason);
     Task UpdateStepStatusAsync(Guid stepId, string status, Guid? completedBy = null);
+}
+
+public interface IApprovalGroupRepository
+{
+    Task<IEnumerable<ApprovalGroup>> GetByCompanyAsync(Guid companyId);
+    Task<ApprovalGroup?> GetByIdAsync(Guid id, Guid companyId);
+    Task<Guid> CreateAsync(ApprovalGroup group, IEnumerable<Guid> memberIds);
+    Task UpdateAsync(ApprovalGroup group, IEnumerable<Guid> memberIds);
+    Task DeleteAsync(Guid id, Guid companyId);
+}
+
+public interface IWorkflowTemplateRepository
+{
+    Task<IEnumerable<WorkflowTemplate>> GetByCompanyAsync(Guid companyId);
+    Task<WorkflowTemplate?> GetByIdAsync(Guid id, Guid companyId);
+    Task<Guid> CreateAsync(WorkflowTemplate template);
+    Task UpdateAsync(WorkflowTemplate template);
+    Task DeleteAsync(Guid id, Guid companyId);
 }

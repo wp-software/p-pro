@@ -85,6 +85,14 @@ public class WorkflowsController : BaseApiController
             var id = await _service.CreateAsync(companyId, request, userId);
             return CreatedAtAction(nameof(GetById), new { id }, new { id });
         }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(403, new { message = ex.Message });
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Erro ao criar workflow");
@@ -102,6 +110,14 @@ public class WorkflowsController : BaseApiController
             await _service.ApproveStepAsync(id, stepId, companyId, userId, request.Comments);
             return Ok(ApiResponse.Ok("Etapa aprovada com sucesso"));
         }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(403, new { message = ex.Message });
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Erro ao aprovar etapa {StepId} do workflow {Id}", stepId, id);
@@ -118,6 +134,14 @@ public class WorkflowsController : BaseApiController
             var userId = GetRequiredUserId();
             await _service.RejectStepAsync(id, stepId, companyId, userId, request.Comments ?? string.Empty);
             return Ok(ApiResponse.Ok("Etapa rejeitada"));
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(403, new { message = ex.Message });
         }
         catch (Exception ex)
         {

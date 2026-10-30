@@ -22,6 +22,7 @@ public interface IWorkflowService
 public class WorkflowService : IWorkflowService
 {
     private readonly IWorkflowRepository _repo;
+    private readonly IApprovalGroupRepository _groups;
     private readonly INotificationService _notifications;
     private readonly IEmailService _emailService;
     private readonly IUnitOfWork _uow;
@@ -30,6 +31,7 @@ public class WorkflowService : IWorkflowService
 
     public WorkflowService(
         IWorkflowRepository repo,
+        IApprovalGroupRepository groups,
         INotificationService notifications,
         IEmailService emailService,
         IUnitOfWork uow,
@@ -37,6 +39,7 @@ public class WorkflowService : IWorkflowService
         IConfiguration configuration)
     {
         _repo = repo;
+        _groups = groups;
         _notifications = notifications;
         _emailService = emailService;
         _uow = uow;
@@ -68,59 +71,95 @@ public class WorkflowService : IWorkflowService
         workflow.CreatedBy = requestedBy;
         workflow.UpdatedBy = requestedBy;
 
-        var steps = request.Steps.Select(s => new WorkflowStep
-        {
-            Name = s.Name,
-            Description = s.Description,
-            StepType = s.StepType,
-            AssignedRole = s.AssignedRole,
-            AssignedUserId = s.AssignedUserId,
-            DueDate = s.DueDate
-        }).ToList();
+        var steps = new List<WorkflowStep>();
+        foreach (var r in request.Steps)
+            steps.Add(await BuildStepAsync(companyId, r));
 
         var workflowId = await _repo.CreateAsync(workflow, steps);
 
-        // Notificar aprovador da primeira etapa
         var firstStep = steps.FirstOrDefault(s => s.StepOrder == 1) ?? steps.FirstOrDefault();
-        if (firstStep?.AssignedUserId != null)
-        {
-            var requester = await _uow.Users.GetByIdAsync(requestedBy);
-            var requesterName = requester?.Name ?? "Sistema";
-            var inAppActionUrl = $"/approvals/{workflowId}";
-            var emailActionUrl = $"{GetFrontendUrl()}/approvals/{workflowId}";
+        if (firstStep != null)
+            await NotifyStepApproversAsync(companyId, workflowId, workflow, firstStep);
 
+        return workflowId;
+    }
+
+    private async Task<WorkflowStep> BuildStepAsync(Guid companyId, CreateWorkflowStepRequest r)
+    {
+        var step = new WorkflowStep
+        {
+            Name = r.Name,
+            Description = r.Description,
+            StepType = r.StepType,
+            AssignedRole = r.AssignedRole,
+            AssignedUserId = r.AssignedUserId,
+            DueDate = r.DueDate
+        };
+
+        if (r.AssignedGroupId == null) return step;
+
+        if (r.ApprovalMode != null && !ApprovalModes.IsValid(r.ApprovalMode))
+            throw new ArgumentException("Modo de aprovação inválido. Use 'any' ou 'all'.");
+
+        var group = await _groups.GetByIdAsync(r.AssignedGroupId.Value, companyId)
+            ?? throw new ArgumentException("Grupo de aprovação não encontrado.");
+        if (!group.IsActive)
+            throw new ArgumentException($"O grupo \"{group.Name}\" está inativo.");
+        if (group.Members.Count == 0)
+            throw new ArgumentException($"O grupo \"{group.Name}\" não possui membros.");
+
+        // Membros e modo são copiados para a etapa: mudanças futuras no grupo não afetam fluxos em andamento.
+        step.AssignedGroupId = group.Id;
+        step.AssignedUserId = null;
+        step.AssignedRole = null;
+        step.ApprovalMode = r.ApprovalMode ?? group.ApprovalMode;
+        step.Approvers = group.Members
+            .Select(m => new WorkflowStepApprover { UserId = m.UserId, UserName = m.UserName })
+            .ToList();
+        return step;
+    }
+
+    private async Task NotifyStepApproversAsync(Guid companyId, Guid workflowId, Workflow workflow, WorkflowStep step)
+    {
+        var userIds = step.Approvers.Count > 0
+            ? step.Approvers.Select(a => a.UserId).ToList()
+            : step.AssignedUserId.HasValue ? new List<Guid> { step.AssignedUserId.Value } : new List<Guid>();
+        if (userIds.Count == 0) return;
+
+        var requester = await _uow.Users.GetByIdAsync(workflow.RequestedBy);
+        var requesterName = requester?.Name ?? "Sistema";
+        var inAppActionUrl = $"/approvals/{workflowId}";
+        var emailActionUrl = $"{GetFrontendUrl()}/approvals/{workflowId}";
+
+        foreach (var userId in userIds)
+        {
             await _notifications.NotifyAsync(
                 companyId,
-                firstStep.AssignedUserId.Value,
+                userId,
                 "workflow_assigned",
                 $"Aprovação solicitada: {workflow.Title}",
-                $"Você foi designado como aprovador na etapa \"{firstStep.Name}\". Solicitado por: {requesterName}.",
+                $"Você foi designado como aprovador na etapa \"{step.Name}\". Solicitado por: {requesterName}.",
                 actionUrl: inAppActionUrl,
                 referenceType: "workflow",
                 referenceId: workflowId);
 
-            var pref = await _notifications.GetPreferenceChannelAsync(firstStep.AssignedUserId.Value, "workflow_assigned");
-            if (pref != "none" && pref != "in_app")
+            var pref = await _notifications.GetPreferenceChannelAsync(userId, "workflow_assigned");
+            if (pref == "none" || pref == "in_app") continue;
+
+            var assignee = await _uow.Users.GetByIdAsync(userId);
+            if (assignee == null) continue;
+            try
             {
-                var assignee = await _uow.Users.GetByIdAsync(firstStep.AssignedUserId.Value);
-                if (assignee != null)
-                {
-                    try
-                    {
-                        await _emailService.SendApprovalAssignedEmailAsync(
-                            assignee.Email, assignee.Name,
-                            workflow.Title, firstStep.Name, requesterName,
-                            workflow.Priority, firstStep.DueDate, emailActionUrl);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Falha ao enviar e-mail de atribuição de aprovação para {Email}", assignee.Email);
-                    }
-                }
+                await _emailService.SendApprovalAssignedEmailAsync(
+                    assignee.Email, assignee.Name,
+                    workflow.Title, step.Name, requesterName,
+                    workflow.Priority, step.DueDate, emailActionUrl);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Falha ao enviar e-mail de atribuição de aprovação para {Email}", assignee.Email);
             }
         }
-
-        return workflowId;
     }
 
     public async Task<WorkflowResponse?> GetByIdAsync(Guid id, Guid companyId)
@@ -142,104 +181,101 @@ public class WorkflowService : IWorkflowService
         return items.Select(MapToResponse);
     }
 
+    /// <summary>Valida estado do fluxo/etapa e elegibilidade do usuário; retorna o fluxo e a etapa.</summary>
+    private async Task<(Workflow Workflow, WorkflowStep Step)> LoadDecidableStepAsync(
+        Guid workflowId, Guid stepId, Guid companyId, Guid userId)
+    {
+        var workflow = await _repo.GetByIdAsync(workflowId, companyId)
+            ?? throw new InvalidOperationException("Workflow não encontrado.");
+        if (workflow.Status is not (WorkflowStatuses.Pending or WorkflowStatuses.InProgress))
+            throw new InvalidOperationException("Este fluxo não está mais em andamento.");
+
+        var step = workflow.Steps.FirstOrDefault(s => s.Id == stepId)
+            ?? throw new InvalidOperationException("Etapa não encontrada.");
+        if (!step.IsCurrent || step.Status != WorkflowStepStatuses.InProgress)
+            throw new InvalidOperationException("Esta etapa não está aguardando decisão.");
+
+        if (step.AssignedGroupId.HasValue || step.Approvers.Count > 0)
+        {
+            if (step.Approvers.All(a => a.UserId != userId))
+                throw new UnauthorizedAccessException("Você não é membro do grupo aprovador desta etapa.");
+        }
+        else if (step.AssignedUserId.HasValue && step.AssignedUserId != userId)
+        {
+            throw new UnauthorizedAccessException("Você não é o aprovador desta etapa.");
+        }
+
+        if (step.Approvals.Any(a => a.UserId == userId))
+            throw new InvalidOperationException("Você já registrou sua decisão nesta etapa.");
+
+        return (workflow, step);
+    }
+
     public async Task ApproveStepAsync(Guid workflowId, Guid stepId, Guid companyId, Guid userId, string? comments = null)
     {
-        var approval = new WorkflowApproval
+        var (workflow, step) = await LoadDecidableStepAsync(workflowId, stepId, companyId, userId);
+
+        await _repo.RecordApprovalAsync(new WorkflowApproval
         {
             WorkflowStepId = stepId,
             UserId = userId,
             Decision = WorkflowDecisions.Approved,
             Comments = comments,
             DecidedAt = DateTime.UtcNow
-        };
-        await _repo.RecordApprovalAsync(approval);
-        await _repo.UpdateStepStatusAsync(stepId, WorkflowStepStatuses.Completed, userId);
+        });
 
-        var workflow = await _repo.GetByIdAsync(workflowId, companyId)
-            ?? throw new InvalidOperationException("Workflow não encontrado.");
+        // Grupo em modo "all": a etapa só conclui quando todos os membros aprovarem.
+        if (step.Approvers.Count > 0 && step.ApprovalMode == ApprovalModes.All)
+        {
+            var approvedIds = step.Approvals
+                .Where(a => a.Decision == WorkflowDecisions.Approved)
+                .Select(a => a.UserId)
+                .Append(userId)
+                .ToHashSet();
+            if (step.Approvers.Any(a => !approvedIds.Contains(a.UserId)))
+                return;
+        }
+
+        await _repo.UpdateStepStatusAsync(stepId, WorkflowStepStatuses.Completed, userId);
 
         var approver = await _uow.Users.GetByIdAsync(userId);
         var approverName = approver?.Name ?? "Aprovador";
 
         if (workflow.CurrentStep >= workflow.TotalSteps)
         {
-            // Fluxo completamente aprovado — notificar solicitante
             await _repo.CompleteWorkflowAsync(workflowId, WorkflowStatuses.Approved);
-
-            await _NotifyRequesterDecisionAsync(
-                companyId, workflow, "approved", approverName, comments);
+            await _NotifyRequesterDecisionAsync(companyId, workflow, "approved", approverName, comments);
+            return;
         }
-        else
-        {
-            // Avança para próxima etapa
-            var nextStepNumber = workflow.CurrentStep + 1;
-            await _repo.AdvanceStepAsync(workflowId, nextStepNumber);
 
-            // Notificar aprovador da próxima etapa
-            var nextStepAssignee = workflow.Steps
-                .FirstOrDefault(s => s.StepOrder == nextStepNumber);
-            if (nextStepAssignee?.AssignedUserId != null)
-            {
-                var requester = await _uow.Users.GetByIdAsync(workflow.RequestedBy);
-                var requesterName = requester?.Name ?? "Sistema";
-                var inAppActionUrl = $"/approvals/{workflowId}";
-                var emailActionUrl = $"{GetFrontendUrl()}/approvals/{workflowId}";
+        var nextStepNumber = workflow.CurrentStep + 1;
+        await _repo.AdvanceStepAsync(workflowId, nextStepNumber);
 
-                await _notifications.NotifyAsync(
-                    companyId,
-                    nextStepAssignee.AssignedUserId.Value,
-                    "workflow_assigned",
-                    $"Aprovação solicitada: {workflow.Title}",
-                    $"Você foi designado como aprovador na etapa \"{nextStepAssignee.Name}\". Solicitado por: {requesterName}.",
-                    actionUrl: inAppActionUrl,
-                    referenceType: "workflow",
-                    referenceId: workflowId);
-
-                var pref = await _notifications.GetPreferenceChannelAsync(nextStepAssignee.AssignedUserId.Value, "workflow_assigned");
-                if (pref != "none" && pref != "in_app")
-                {
-                    var assigneeUser = await _uow.Users.GetByIdAsync(nextStepAssignee.AssignedUserId.Value);
-                    if (assigneeUser != null)
-                    {
-                        try
-                        {
-                            await _emailService.SendApprovalAssignedEmailAsync(
-                                assigneeUser.Email, assigneeUser.Name,
-                                workflow.Title, nextStepAssignee.Name, requesterName,
-                                workflow.Priority, nextStepAssignee.DueDate, emailActionUrl);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "Falha ao enviar e-mail de etapa ao aprovador {Email}", assigneeUser.Email);
-                        }
-                    }
-                }
-            }
-        }
+        var nextStep = workflow.Steps.FirstOrDefault(s => s.StepOrder == nextStepNumber);
+        if (nextStep != null)
+            await NotifyStepApproversAsync(companyId, workflowId, workflow, nextStep);
     }
 
     public async Task RejectStepAsync(Guid workflowId, Guid stepId, Guid companyId, Guid userId, string comments)
     {
-        var approval = new WorkflowApproval
+        var (workflow, _) = await LoadDecidableStepAsync(workflowId, stepId, companyId, userId);
+
+        // Uma rejeição de qualquer membro encerra o fluxo, em qualquer modo de aprovação.
+        await _repo.RecordApprovalAsync(new WorkflowApproval
         {
             WorkflowStepId = stepId,
             UserId = userId,
             Decision = WorkflowDecisions.Rejected,
             Comments = comments,
             DecidedAt = DateTime.UtcNow
-        };
-        await _repo.RecordApprovalAsync(approval);
+        });
         await _repo.UpdateStepStatusAsync(stepId, WorkflowStepStatuses.Completed, userId);
         await _repo.CompleteWorkflowAsync(workflowId, WorkflowStatuses.Rejected);
-
-        var workflow = await _repo.GetByIdAsync(workflowId, companyId);
-        if (workflow == null) return;
 
         var approver = await _uow.Users.GetByIdAsync(userId);
         var approverName = approver?.Name ?? "Aprovador";
 
-        await _NotifyRequesterDecisionAsync(
-            companyId, workflow, "rejected", approverName, comments);
+        await _NotifyRequesterDecisionAsync(companyId, workflow, "rejected", approverName, comments);
     }
 
     private async Task _NotifyRequesterDecisionAsync(
@@ -325,12 +361,29 @@ public class WorkflowService : IWorkflowService
             StepType = s.StepType,
             AssignedRole = s.AssignedRole,
             AssignedUserId = s.AssignedUserId,
+            AssignedGroupId = s.AssignedGroupId,
+            AssignedGroupName = s.AssignedGroupName,
+            ApprovalMode = s.ApprovalMode,
             Status = s.Status,
             IsCurrent = s.IsCurrent,
             StartedAt = s.StartedAt,
             DueDate = s.DueDate,
             CompletedAt = s.CompletedAt,
-            Notes = s.Notes
+            Notes = s.Notes,
+            Approvers = s.Approvers.Select(a => new StepApproverResponse
+            {
+                UserId = a.UserId,
+                UserName = a.UserName ?? string.Empty
+            }).ToList(),
+            Approvals = s.Approvals.Select(a => new StepApprovalResponse
+            {
+                Id = a.Id,
+                UserId = a.UserId,
+                UserName = a.UserName ?? string.Empty,
+                Decision = a.Decision,
+                Comments = a.Comments,
+                DecidedAt = a.DecidedAt
+            }).ToList()
         }).ToList()
     };
 }

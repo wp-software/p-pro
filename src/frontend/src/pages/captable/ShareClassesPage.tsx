@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { useShareClasses, useCreateShareClass, useUpdateShareClass, useDeleteShareClass } from '@/hooks/useShareClasses';
 import { useClientStore } from '@/stores/clientStore';
 import type { ShareClass } from '@/services/shareClassService';
-import type { CreateShareClassRequest, ShareClassRequest } from '@/services/shareClassService';
+import type { ShareClassRequest } from '@/services/shareClassService';
 import { Button, Card, Input } from '@/components/ui';
 
 const formSchema = z.object({
@@ -55,13 +55,12 @@ const emptyForm: FormValues = {
 };
 
 interface ShareClassFormProps {
-  companyId: string;
   shareClass: ShareClass | null;
   classes: ShareClass[];
   onClose: () => void;
 }
 
-function ShareClassForm({ companyId, shareClass, classes, onClose }: ShareClassFormProps) {
+function ShareClassForm({ shareClass, classes, onClose }: ShareClassFormProps) {
   const { t } = useTranslation();
   const createShareClass = useCreateShareClass();
   const updateShareClass = useUpdateShareClass();
@@ -108,8 +107,7 @@ function ShareClassForm({ companyId, shareClass, classes, onClose }: ShareClassF
     if (shareClass) {
       updateShareClass.mutate({ id: shareClass.id, data: request }, { onSuccess: onClose });
     } else {
-      const createRequest: CreateShareClassRequest = { ...request, companyId };
-      createShareClass.mutate(createRequest, { onSuccess: onClose });
+      createShareClass.mutate(request, { onSuccess: onClose });
     }
   };
 
@@ -163,7 +161,10 @@ function ShareClassForm({ companyId, shareClass, classes, onClose }: ShareClassF
                   <label className="input-label">{t('shareClasses.convertsTo')}</label>
                   <select className="input w-full" {...register('convertsToClassId')}>
                     <option value="">{t('shareClasses.noConversionTarget')}</option>
-                    {classes.filter((item) => item.id !== shareClass?.id).map((item) => (
+                    {classes.filter((item) =>
+                      item.id !== shareClass?.id &&
+                      (!shareClass || !item.companyId || item.companyId === shareClass.companyId)
+                    ).map((item) => (
                       <option key={item.id} value={item.id}>{item.code} - {item.name}</option>
                     ))}
                   </select>
@@ -207,16 +208,14 @@ export default function ShareClassesPage() {
     page,
     10,
     search || undefined,
-    status || undefined,
-    !!selectedCompanyId
+    status || undefined
   );
   const { data: classOptions } = useShareClasses(
     selectedCompanyId ?? undefined,
     1,
     100,
     undefined,
-    undefined,
-    !!selectedCompanyId
+    undefined
   );
   const deleteShareClass = useDeleteShareClass();
   const totalPages = data?.totalPages ?? 1;
@@ -231,18 +230,13 @@ export default function ShareClassesPage() {
         <Button
           icon={<Plus size={16} />}
           onClick={() => setFormClass(null)}
-          disabled={!selectedCompanyId}
         >
           {t('shareClasses.new')}
         </Button>
       </div>
 
-      {!selectedCompanyId ? (
-        <Card className="p-8 text-center text-gray-500">{t('shareClasses.selectCompany')}</Card>
-      ) : (
-        <>
-          <Card className="p-4">
-            <div className="flex flex-col gap-3 sm:flex-row">
+      <Card className="p-4">
+        <div className="flex flex-col gap-3 sm:flex-row">
               <div className="relative flex-1">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <Input
@@ -263,10 +257,10 @@ export default function ShareClassesPage() {
                 <option value="Active">{t('shareClasses.active')}</option>
                 <option value="Inactive">{t('shareClasses.inactive')}</option>
               </select>
-            </div>
-          </Card>
+        </div>
+      </Card>
 
-          <Card>
+      <Card>
             {isLoading ? (
               <div className="py-12 text-center text-gray-500">{t('common.loading')}</div>
             ) : isError ? (
@@ -288,6 +282,7 @@ export default function ShareClassesPage() {
                     <tr className="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-400">
                       <th className="px-4 py-3">{t('shareClasses.code')}</th>
                       <th className="px-4 py-3">{t('shareClasses.name')}</th>
+                      <th className="px-4 py-3">{t('shareClasses.scope')}</th>
                       <th className="px-4 py-3">{t('shareClasses.voting')}</th>
                       <th className="px-4 py-3">{t('common.status')}</th>
                       <th className="px-4 py-3 text-right">{t('common.actions')}</th>
@@ -300,6 +295,9 @@ export default function ShareClassesPage() {
                         <td className="px-4 py-3">
                           <p className="font-medium text-gray-800">{item.name}</p>
                           {item.description && <p className="mt-0.5 max-w-sm truncate text-xs text-gray-400">{item.description}</p>}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {item.companyName || t('shareClasses.allCompanies')}
                         </td>
                         <td className="px-4 py-3 text-gray-600">
                           {item.hasVotingRights ? `${item.votesPerShare} ${t('shareClasses.votesPerShareShort')}` : t('shareClasses.noVotingRights')}
@@ -354,13 +352,10 @@ export default function ShareClassesPage() {
                 </div>
               </div>
             )}
-          </Card>
-        </>
-      )}
+      </Card>
 
-      {formClass !== undefined && selectedCompanyId && (
+      {formClass !== undefined && (
         <ShareClassForm
-          companyId={selectedCompanyId}
           shareClass={formClass}
           classes={classOptions?.items ?? []}
           onClose={() => setFormClass(undefined)}

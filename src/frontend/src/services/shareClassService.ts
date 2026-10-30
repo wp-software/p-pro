@@ -11,8 +11,8 @@ interface ApiResponse<T> {
 export interface ShareClass {
   id: string;
   clientId: string;
-  companyId: string;
-  companyName: string;
+  companyId: string | null;
+  companyName: string | null;
   code: string;
   name: string;
   description?: string;
@@ -52,9 +52,7 @@ export interface ShareClassRequest {
   displayOrder: number;
 }
 
-export interface CreateShareClassRequest extends ShareClassRequest {
-  companyId: string;
-}
+export type CreateShareClassRequest = ShareClassRequest;
 
 export interface ShareClassSummary {
   id: string;

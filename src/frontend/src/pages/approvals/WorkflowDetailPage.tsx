@@ -123,10 +123,15 @@ export default function WorkflowDetailPage() {
   }
 
   const currentStep = workflow.steps?.find((s) => s.isCurrent);
+  const isGroupStep = !!currentStep && (!!currentStep.assignedGroupId || (currentStep.approvers?.length ?? 0) > 0);
+  const alreadyDecided = !!currentStep?.approvals?.some((a) => a.userId === user?.id);
   const canAct =
     currentStep &&
-    (currentStep.assignedUserId === user?.id ||
-      (currentStep.assignedRole && user?.roles?.includes(currentStep.assignedRole)));
+    !alreadyDecided &&
+    (isGroupStep
+      ? currentStep.approvers?.some((a) => a.userId === user?.id)
+      : currentStep.assignedUserId === user?.id ||
+        (currentStep.assignedRole && user?.roles?.includes(currentStep.assignedRole)));
 
   function handleConfirmAction(comments: string) {
     if (!approvalModal) return;
@@ -222,6 +227,25 @@ export default function WorkflowDetailPage() {
                             {step.assignedRole}
                           </p>
                         )}
+                        {(step.assignedGroupId || step.assignedGroupName || (step.approvers?.length ?? 0) > 0) && (
+                          <div className="mt-0.5">
+                            <p className="text-xs text-primary-400 flex items-center gap-1">
+                              <User className="w-3 h-3" />
+                              {step.assignedGroupName ?? 'Grupo'} ·{' '}
+                              {step.approvalMode === 'all'
+                                ? `todos devem aprovar (${step.approvals?.filter((a) => a.decision === 'approved').length ?? 0}/${step.approvers?.length ?? 0})`
+                                : 'basta um aprovar'}
+                            </p>
+                            {step.approvers && step.approvers.length > 0 && (
+                              <p className="text-xs text-primary-400 mt-0.5">
+                                {step.approvers.map((a) => {
+                                  const d = step.approvals?.find((x) => x.userId === a.userId)?.decision;
+                                  return `${a.userName}${d === 'approved' ? ' ✓' : d === 'rejected' ? ' ✗' : ''}`;
+                                }).join(', ')}
+                              </p>
+                            )}
+                          </div>
+                        )}
                         {step.notes && <p className="text-xs text-primary-500 mt-1 italic">{step.notes}</p>}
                       </div>
                       {step.completedAt && (
@@ -236,7 +260,10 @@ export default function WorkflowDetailPage() {
                           <div key={approval.id} className="flex items-start gap-2 text-xs text-primary-500">
                             {approval.decision === 'approved' && <CheckCircle className="w-3.5 h-3.5 text-green-500 mt-0.5 shrink-0" />}
                             {approval.decision === 'rejected' && <XCircle className="w-3.5 h-3.5 text-red-500 mt-0.5 shrink-0" />}
-                            <span>{approval.comments || (approval.decision === 'approved' ? 'Aprovado' : 'Rejeitado')}</span>
+                            <span>
+                              {approval.userName ? <strong>{approval.userName}: </strong> : null}
+                              {approval.comments || (approval.decision === 'approved' ? 'Aprovado' : 'Rejeitado')}
+                            </span>
                           </div>
                         ))}
                       </div>

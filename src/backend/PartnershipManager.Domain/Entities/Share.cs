@@ -10,6 +10,7 @@ public class Share : BaseEntity
     public Guid ClientId { get; private set; }
     public Guid CompanyId { get; private set; }
     public Guid ShareholderId { get; private set; }
+    public ShareholderType ShareholderType { get; private set; }
     public Guid ShareClassId { get; private set; }
     public string? CertificateNumber { get; private set; }
     public decimal Quantity { get; private set; }

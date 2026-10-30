@@ -151,7 +151,8 @@ public class ShareService : IShareService
 
         // Validate share class
         var shareClass = await _shareClassRepository.GetByIdAsync(request.ShareClassId, clientId);
-        if (shareClass == null || shareClass.CompanyId != request.CompanyId)
+        if (shareClass == null ||
+            (shareClass.CompanyId.HasValue && shareClass.CompanyId != request.CompanyId))
         {
             throw new NotFoundException("ShareClass", request.ShareClassId);
         }
@@ -288,7 +289,8 @@ public class ShareService : IShareService
 
         // Validate share class
         var shareClass = await _shareClassRepository.GetByIdAsync(request.ShareClassId, clientId);
-        if (shareClass == null || shareClass.CompanyId != request.CompanyId)
+        if (shareClass == null ||
+            (shareClass.CompanyId.HasValue && shareClass.CompanyId != request.CompanyId))
         {
             throw new NotFoundException("ShareClass", request.ShareClassId);
         }
@@ -455,8 +457,8 @@ public class ShareService : IShareService
             {
                 ShareholderId = g.Key.ShareholderId,
                 ShareholderName = g.First().ShareholderName ?? "Unknown",
-                ShareholderType = ShareholderType.Founder, // Would need to join with shareholders table
-                ShareholderTypeDescription = "Founder",
+                ShareholderType = g.First().ShareholderType,
+                ShareholderTypeDescription = g.First().ShareholderType.ToString(),
                 ShareClassId = g.Key.ShareClassId,
                 ShareClassName = g.First().ShareClassName ?? "Unknown",
                 ShareClassCode = g.First().ShareClassCode ?? "Unknown",

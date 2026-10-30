@@ -56,7 +56,7 @@ public class ShareClassRepository : IShareClassRepository
         string? status = null)
     {
         var baseQuery = new StringBuilder(@"FROM share_classes sc
-                    JOIN companies c ON c.id = sc.company_id
+                    LEFT JOIN companies c ON c.id = sc.company_id
                     LEFT JOIN share_classes sct ON sct.id = sc.converts_to_class_id
                     WHERE sc.is_deleted = 0
                       AND sc.client_id = @ClientId");
@@ -66,8 +66,18 @@ public class ShareClassRepository : IShareClassRepository
 
         if (companyId.HasValue)
         {
-            baseQuery.Append(" AND sc.company_id = @CompanyId");
+            baseQuery.Append(@" AND (sc.company_id = @CompanyId OR sc.company_id IS NULL)
+                                AND (sc.company_id IS NOT NULL OR NOT EXISTS (
+                                    SELECT 1 FROM share_classes local
+                                    WHERE local.client_id = sc.client_id
+                                      AND local.company_id = @CompanyId
+                                      AND local.code = sc.code
+                                      AND local.is_deleted = 0))");
             parameters.Add("CompanyId", companyId.Value.ToString());
+        }
+        else
+        {
+            baseQuery.Append(" AND sc.company_id IS NULL");
         }
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -101,10 +111,16 @@ public class ShareClassRepository : IShareClassRepository
     {
         var sql = $@"SELECT {SelectColumns}
                     FROM share_classes sc
-                    JOIN companies c ON c.id = sc.company_id
+                    LEFT JOIN companies c ON c.id = sc.company_id
                     LEFT JOIN share_classes sct ON sct.id = sc.converts_to_class_id
                     WHERE sc.client_id = @ClientId
-                      AND sc.company_id = @CompanyId
+                      AND (sc.company_id = @CompanyId OR sc.company_id IS NULL)
+                      AND (sc.company_id IS NOT NULL OR NOT EXISTS (
+                          SELECT 1 FROM share_classes local
+                          WHERE local.client_id = sc.client_id
+                            AND local.company_id = @CompanyId
+                            AND local.code = sc.code
+                            AND local.is_deleted = 0))
                       AND sc.is_deleted = 0
                     ORDER BY sc.display_order ASC, sc.name ASC";
 
@@ -121,7 +137,7 @@ public class ShareClassRepository : IShareClassRepository
     {
         var sql = $@"SELECT {SelectColumns}
                     FROM share_classes sc
-                    JOIN companies c ON c.id = sc.company_id
+                    LEFT JOIN companies c ON c.id = sc.company_id
                     LEFT JOIN share_classes sct ON sct.id = sc.converts_to_class_id
                     WHERE sc.id = @Id AND sc.client_id = @ClientId AND sc.is_deleted = 0";
 
@@ -138,12 +154,20 @@ public class ShareClassRepository : IShareClassRepository
     {
         var sql = $@"SELECT {SelectColumns}
                     FROM share_classes sc
-                    JOIN companies c ON c.id = sc.company_id
+                    LEFT JOIN companies c ON c.id = sc.company_id
                     LEFT JOIN share_classes sct ON sct.id = sc.converts_to_class_id
                     WHERE sc.client_id = @ClientId
-                      AND sc.company_id = @CompanyId
+                      AND (sc.company_id = @CompanyId OR sc.company_id IS NULL)
+                      AND (sc.company_id = @CompanyId OR NOT EXISTS (
+                          SELECT 1 FROM share_classes local
+                          WHERE local.client_id = sc.client_id
+                            AND local.company_id = @CompanyId
+                            AND local.code = sc.code
+                            AND local.is_deleted = 0))
                       AND UPPER(sc.code) = UPPER(@Code)
-                      AND sc.is_deleted = 0";
+                      AND sc.is_deleted = 0
+                    ORDER BY (sc.company_id = @CompanyId) DESC
+                    LIMIT 1";
 
         var shareClass = await Connection.QueryFirstOrDefaultAsync<dynamic>(sql, new
         {
@@ -155,11 +179,11 @@ public class ShareClassRepository : IShareClassRepository
         return shareClass == null ? null : MapToShareClass(shareClass);
     }
 
-    public async Task<bool> CodeExistsAsync(Guid clientId, Guid companyId, string code, Guid? excludeId = null)
+    public async Task<bool> CodeExistsAsync(Guid clientId, Guid? companyId, string code, Guid? excludeId = null)
     {
         var sql = @"SELECT COUNT(1) FROM share_classes
                     WHERE client_id = @ClientId
-                      AND company_id = @CompanyId
+                      AND company_id <=> @CompanyId
                       AND UPPER(code) = UPPER(@Code)
                       AND is_deleted = 0
                       AND (@ExcludeId IS NULL OR id != @ExcludeId)";
@@ -167,7 +191,7 @@ public class ShareClassRepository : IShareClassRepository
         var count = await Connection.ExecuteScalarAsync<int>(sql, new
         {
             ClientId = clientId.ToString(),
-            CompanyId = companyId.ToString(),
+            CompanyId = companyId?.ToString(),
             Code = code.ToUpperInvariant(),
             ExcludeId = excludeId?.ToString()
         }, Transaction);
@@ -192,7 +216,7 @@ public class ShareClassRepository : IShareClassRepository
         {
             Id = shareClass.Id.ToString(),
             ClientId = shareClass.ClientId.ToString(),
-            CompanyId = shareClass.CompanyId.ToString(),
+            CompanyId = shareClass.CompanyId?.ToString(),
             shareClass.Name,
             shareClass.Code,
             shareClass.Description,
@@ -324,7 +348,7 @@ public class ShareClassRepository : IShareClassRepository
 
         var shareClass = ShareClass.Create(
             ParseGuid(row.ClientId),
-            ParseGuid(row.CompanyId),
+            ParseNullableGuid(row.CompanyId),
             (string)row.Name,
             (string)row.Code,
             (string?)row.Description,

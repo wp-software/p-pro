@@ -63,9 +63,17 @@ export interface WorkflowApproval {
   id: string;
   workflowStepId: string;
   userId: string;
+  userName?: string;
   decision: 'approved' | 'rejected' | 'requested_changes';
   comments?: string;
   decidedAt: string;
+}
+
+export type ApprovalMode = 'any' | 'all';
+
+export interface StepApprover {
+  userId: string;
+  userName: string;
 }
 
 export interface WorkflowStep {
@@ -77,6 +85,10 @@ export interface WorkflowStep {
   stepType: 'approval' | 'review' | 'notification' | 'automated';
   assignedRole?: string;
   assignedUserId?: string;
+  assignedGroupId?: string;
+  assignedGroupName?: string;
+  approvalMode?: ApprovalMode;
+  approvers?: StepApprover[];
   status: 'pending' | 'in_progress' | 'completed' | 'skipped';
   isCurrent: boolean;
   startedAt?: string;
@@ -114,6 +126,9 @@ export interface CreateWorkflowStepRequest {
   stepType: string;
   assignedRole?: string;
   assignedUserId?: string;
+  assignedGroupId?: string;
+  approvalMode?: ApprovalMode;
+  description?: string;
   dueDate?: string;
 }
 
@@ -126,6 +141,65 @@ export interface CreateWorkflowRequest {
   priority: string;
   dueDate?: string;
   steps: CreateWorkflowStepRequest[];
+}
+
+// ─── Approval groups & workflow templates ─────────────────────────────────────
+
+export interface ApprovalGroupMember {
+  userId: string;
+  name: string;
+  email?: string;
+}
+
+export interface ApprovalGroup {
+  id: string;
+  name: string;
+  description?: string;
+  approvalMode: ApprovalMode;
+  isActive: boolean;
+  members: ApprovalGroupMember[];
+}
+
+export interface SaveApprovalGroupRequest {
+  name: string;
+  description?: string;
+  approvalMode: ApprovalMode;
+  isActive: boolean;
+  memberIds: string[];
+}
+
+export type StepDueMode = 'none' | 'calendar_days' | 'business_days';
+
+export interface WorkflowTemplateStep {
+  name: string;
+  description?: string;
+  stepType: string;
+  assignedRole?: string;
+  assignedUserId?: string;
+  assignedGroupId?: string;
+  assignedGroupName?: string;
+  approvalMode?: ApprovalMode;
+  dueMode: StepDueMode;
+  dueDays: number;
+}
+
+export interface WorkflowTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  workflowType: string;
+  priority: string;
+  isActive: boolean;
+  steps: WorkflowTemplateStep[];
+}
+
+export interface SaveWorkflowTemplateRequest {
+  name: string;
+  description?: string;
+  workflowType: string;
+  priority: string;
+  isActive: boolean;
+  steps: WorkflowTemplateStep[];
 }
 
 // ─── DataRoom types ───────────────────────────────────────────────────────────

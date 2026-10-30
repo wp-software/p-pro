@@ -230,6 +230,9 @@ public static class InfrastructureServiceExtensions
         // Phase 6 - Workflow Module
         services.AddScoped<IWorkflowRepository, WorkflowRepository>();
         services.AddScoped<IWorkflowService, WorkflowService>();
+        services.AddScoped<IApprovalGroupRepository, ApprovalGroupRepository>();
+        services.AddScoped<IWorkflowTemplateRepository, WorkflowTemplateRepository>();
+        services.AddScoped<IApprovalConfigService, ApprovalConfigService>();
 
         // Phase 6 - Investor Portal
         services.AddScoped<IInvestorPortalService, InvestorPortalService>();

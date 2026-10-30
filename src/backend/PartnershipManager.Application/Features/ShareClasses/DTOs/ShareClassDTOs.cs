@@ -7,8 +7,8 @@ public record ShareClassResponse
 {
     public Guid Id { get; init; }
     public Guid ClientId { get; init; }
-    public Guid CompanyId { get; init; }
-    public string CompanyName { get; init; } = string.Empty;
+    public Guid? CompanyId { get; init; }
+    public string? CompanyName { get; init; }
     public string Name { get; init; } = string.Empty;
     public string Code { get; init; } = string.Empty;
     public string? Description { get; init; }
@@ -53,7 +53,6 @@ public class ShareClassListResponse : PagedResult<ShareClassResponse>
 
 public record CreateShareClassRequest
 {
-    public Guid CompanyId { get; init; }
     public string Name { get; init; } = string.Empty;
     public string Code { get; init; } = string.Empty;
     public string? Description { get; init; }

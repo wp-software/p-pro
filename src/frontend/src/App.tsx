@@ -33,6 +33,8 @@ import ApprovalsPage from './pages/approvals/ApprovalsPage';
 import WorkflowDetailPage from './pages/approvals/WorkflowDetailPage';
 import FlowsPage from './pages/approvals/FlowsPage';
 import ApproversPage from './pages/approvals/ApproversPage';
+import ApprovalGroupsPage from './pages/approvals/ApprovalGroupsPage';
+import TemplatesPage from './pages/approvals/TemplatesPage';
 import RolesPage from './pages/settings/RolesPage';
 import CommunicationsPage from './pages/communications';
 import CommunicationDetailPage from './pages/communications/CommunicationDetailPage';
@@ -113,6 +115,8 @@ function App() {
         <Route path="/approvals/:id" element={<WorkflowDetailPage />} />
         <Route path="/approvals/flows" element={<FlowsPage />} />
         <Route path="/approvals/approvers" element={<ApproversPage />} />
+        <Route path="/approvals/groups" element={<ApprovalGroupsPage />} />
+        <Route path="/approvals/templates" element={<TemplatesPage />} />
 
         {/* Communications Routes */}
         <Route path="/communications" element={<CommunicationsPage />} />

@@ -1,4 +1,5 @@
 import { api } from './api';
+import { TransactionType } from '@/types';
 import type {
   Share,
   ShareListResponse,
@@ -19,6 +20,32 @@ interface ApiResponse<T> {
   message?: string;
   errors?: string[];
 }
+
+const transactionTypesByApiValue: Record<string, TransactionType> = {
+  Issue: TransactionType.Issue,
+  Transfer: TransactionType.Transfer,
+  Cancel: TransactionType.Cancel,
+  Convert: TransactionType.Convert,
+  Split: TransactionType.Split,
+  ReverseSplit: TransactionType.Reverse,
+  '1': TransactionType.Issue,
+  '2': TransactionType.Transfer,
+  '3': TransactionType.Cancel,
+  '4': TransactionType.Convert,
+  '5': TransactionType.Split,
+  '6': TransactionType.Reverse,
+};
+
+const normalizeTransaction = (transaction: ShareTransaction): ShareTransaction => {
+  const transactionType: unknown = transaction.transactionType;
+  const normalizedType = transactionTypesByApiValue[String(transactionType)];
+
+  if (normalizedType === undefined) {
+    throw new Error(`Tipo de movimentação inválido recebido da API: ${String(transactionType)}`);
+  }
+
+  return { ...transaction, transactionType: normalizedType };
+};
 
 export const shareService = {
   // ============================================================================
@@ -88,7 +115,10 @@ export const shareService = {
     if (filters?.toDate) params.toDate = filters.toDate;
     
     const response = await api.get<ApiResponse<TransactionListResponse>>('/shares/transactions', { params });
-    return response.data.data;
+    return {
+      ...response.data.data,
+      items: response.data.data.items.map(normalizeTransaction),
+    };
   },
 
   /**
@@ -96,7 +126,7 @@ export const shareService = {
    */
   async getTransactionById(id: string): Promise<ShareTransaction> {
     const response = await api.get<ApiResponse<ShareTransaction>>(`/shares/transactions/${id}`);
-    return response.data.data;
+    return normalizeTransaction(response.data.data);
   },
 
   /**
@@ -104,7 +134,7 @@ export const shareService = {
    */
   async getTransactionsByShareholder(shareholderId: string): Promise<ShareTransaction[]> {
     const response = await api.get<ApiResponse<ShareTransaction[]>>(`/shares/transactions/by-shareholder/${shareholderId}`);
-    return response.data.data;
+    return response.data.data.map(normalizeTransaction);
   },
 
   // ============================================================================

@@ -45,11 +45,18 @@ public class WorkflowRepository : IWorkflowRepository
 
                 var stepSql = @"
                     INSERT INTO workflow_steps (id, workflow_id, step_order, name, description, step_type,
-                        assigned_role, assigned_user_id, status, is_current, started_at, due_date, created_at, updated_at)
+                        assigned_role, assigned_user_id, assigned_group_id, approval_mode, status, is_current, started_at, due_date, created_at, updated_at)
                     VALUES (@Id, @WorkflowId, @StepOrder, @Name, @Description, @StepType,
-                        @AssignedRole, @AssignedUserId, @Status, @IsCurrent, @StartedAt, @DueDate, @CreatedAt, @UpdatedAt)";
+                        @AssignedRole, @AssignedUserId, @AssignedGroupId, @ApprovalMode, @Status, @IsCurrent, @StartedAt, @DueDate, @CreatedAt, @UpdatedAt)";
 
                 await _context.Connection.ExecuteAsync(stepSql, step, tx);
+
+                foreach (var approver in step.Approvers)
+                {
+                    await _context.Connection.ExecuteAsync(
+                        "INSERT INTO workflow_step_approvers (workflow_step_id, user_id) VALUES (@StepId, @UserId)",
+                        new { StepId = step.Id, approver.UserId }, tx);
+                }
             }
 
             _context.CommitTransaction();
@@ -84,7 +91,7 @@ public class WorkflowRepository : IWorkflowRepository
 
         var workflow = await _context.Connection.QueryFirstOrDefaultAsync<Workflow>(sql, new { Id = id, CompanyId = companyId });
         if (workflow != null)
-            workflow.Steps = (await GetStepsAsync(id)).ToList();
+            workflow.Steps = (await GetStepsWithDetailsAsync(id)).ToList();
         return workflow;
     }
 
@@ -134,7 +141,11 @@ public class WorkflowRepository : IWorkflowRepository
             FROM workflows w
             LEFT JOIN users u ON u.id = w.requested_by
             INNER JOIN workflow_steps ws ON ws.workflow_id = w.id AND ws.is_current = 1
-                AND (ws.assigned_user_id = @UserId OR ws.assigned_role IS NOT NULL)
+                AND (ws.assigned_user_id = @UserId OR ws.assigned_role IS NOT NULL
+                     OR EXISTS (SELECT 1 FROM workflow_step_approvers sa
+                                WHERE sa.workflow_step_id = ws.id AND sa.user_id = @UserId))
+                AND NOT EXISTS (SELECT 1 FROM workflow_approvals wa
+                                WHERE wa.workflow_step_id = ws.id AND wa.user_id = @UserId)
             WHERE w.company_id = @CompanyId AND w.status IN ('pending','in_progress') AND w.deleted_at IS NULL";
         return await _context.Connection.QueryAsync<Workflow>(sql, new { UserId = userId, CompanyId = companyId });
     }
@@ -142,25 +153,54 @@ public class WorkflowRepository : IWorkflowRepository
     public async Task<WorkflowStep?> GetCurrentStepAsync(Guid workflowId)
     {
         var sql = @"
-            SELECT id AS Id, workflow_id AS WorkflowId, step_order AS StepOrder, name AS Name,
-                   description AS Description, step_type AS StepType, assigned_role AS AssignedRole,
-                   assigned_user_id AS AssignedUserId, status AS Status, is_current AS IsCurrent,
-                   started_at AS StartedAt, due_date AS DueDate, completed_at AS CompletedAt,
-                   completed_by AS CompletedBy, notes AS Notes, created_at AS CreatedAt, updated_at AS UpdatedAt
-            FROM workflow_steps WHERE workflow_id = @WorkflowId AND is_current = 1 AND deleted_at IS NULL";
+            SELECT ws.id AS Id, ws.workflow_id AS WorkflowId, ws.step_order AS StepOrder, ws.name AS Name,
+                   ws.description AS Description, ws.step_type AS StepType, ws.assigned_role AS AssignedRole,
+                   ws.assigned_user_id AS AssignedUserId, ws.assigned_group_id AS AssignedGroupId,
+                   g.name AS AssignedGroupName, ws.approval_mode AS ApprovalMode,
+                   ws.status AS Status, ws.is_current AS IsCurrent,
+                   ws.started_at AS StartedAt, ws.due_date AS DueDate, ws.completed_at AS CompletedAt,
+                   ws.completed_by AS CompletedBy, ws.notes AS Notes, ws.created_at AS CreatedAt, ws.updated_at AS UpdatedAt
+            FROM workflow_steps ws LEFT JOIN approval_groups g ON g.id = ws.assigned_group_id WHERE ws.workflow_id = @WorkflowId AND ws.is_current = 1 AND ws.deleted_at IS NULL";
         return await _context.Connection.QueryFirstOrDefaultAsync<WorkflowStep>(sql, new { WorkflowId = workflowId });
     }
 
     public async Task<IEnumerable<WorkflowStep>> GetStepsAsync(Guid workflowId)
     {
         var sql = @"
-            SELECT id AS Id, workflow_id AS WorkflowId, step_order AS StepOrder, name AS Name,
-                   description AS Description, step_type AS StepType, assigned_role AS AssignedRole,
-                   assigned_user_id AS AssignedUserId, status AS Status, is_current AS IsCurrent,
-                   started_at AS StartedAt, due_date AS DueDate, completed_at AS CompletedAt,
-                   completed_by AS CompletedBy, notes AS Notes, created_at AS CreatedAt, updated_at AS UpdatedAt
-            FROM workflow_steps WHERE workflow_id = @WorkflowId AND deleted_at IS NULL ORDER BY step_order";
+            SELECT ws.id AS Id, ws.workflow_id AS WorkflowId, ws.step_order AS StepOrder, ws.name AS Name,
+                   ws.description AS Description, ws.step_type AS StepType, ws.assigned_role AS AssignedRole,
+                   ws.assigned_user_id AS AssignedUserId, ws.assigned_group_id AS AssignedGroupId,
+                   g.name AS AssignedGroupName, ws.approval_mode AS ApprovalMode,
+                   ws.status AS Status, ws.is_current AS IsCurrent,
+                   ws.started_at AS StartedAt, ws.due_date AS DueDate, ws.completed_at AS CompletedAt,
+                   ws.completed_by AS CompletedBy, ws.notes AS Notes, ws.created_at AS CreatedAt, ws.updated_at AS UpdatedAt
+            FROM workflow_steps ws LEFT JOIN approval_groups g ON g.id = ws.assigned_group_id WHERE ws.workflow_id = @WorkflowId AND ws.deleted_at IS NULL ORDER BY ws.step_order";
         return await _context.Connection.QueryAsync<WorkflowStep>(sql, new { WorkflowId = workflowId });
+    }
+
+    private async Task<IEnumerable<WorkflowStep>> GetStepsWithDetailsAsync(Guid workflowId)
+    {
+        var steps = (await GetStepsAsync(workflowId)).ToList();
+        if (steps.Count == 0) return steps;
+
+        var ids = steps.Select(s => s.Id).ToArray();
+        var approvers = (await _context.Connection.QueryAsync<WorkflowStepApprover>(@"
+            SELECT sa.workflow_step_id AS WorkflowStepId, sa.user_id AS UserId, u.name AS UserName
+            FROM workflow_step_approvers sa LEFT JOIN users u ON u.id = sa.user_id
+            WHERE sa.workflow_step_id IN @Ids", new { Ids = ids })).ToList();
+        var approvals = (await _context.Connection.QueryAsync<WorkflowApproval>(@"
+            SELECT wa.id AS Id, wa.workflow_step_id AS WorkflowStepId, wa.user_id AS UserId,
+                   wa.decision AS Decision, wa.comments AS Comments, wa.decided_at AS DecidedAt,
+                   u.name AS UserName
+            FROM workflow_approvals wa LEFT JOIN users u ON u.id = wa.user_id
+            WHERE wa.workflow_step_id IN @Ids ORDER BY wa.decided_at", new { Ids = ids })).ToList();
+
+        foreach (var step in steps)
+        {
+            step.Approvers = approvers.Where(a => a.WorkflowStepId == step.Id).ToList();
+            step.Approvals = approvals.Where(a => a.WorkflowStepId == step.Id).ToList();
+        }
+        return steps;
     }
 
     public async Task RecordApprovalAsync(WorkflowApproval approval)

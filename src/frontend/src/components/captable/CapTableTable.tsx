@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { ChevronUp, ChevronDown, Search, X } from 'lucide-react';
 import { Card, Input, Badge } from '@/components/ui';
-import { CapTableEntry } from '@/types';
+import { getShareholderTypeLabel, CapTableEntry } from '@/types';
 import { formatCurrency, formatPercentage, formatNumber } from '@/utils/format';
 
 interface CapTableTableProps {
@@ -80,11 +80,11 @@ export function CapTableTable({ entries = [], isLoading }: CapTableTableProps) {
 
   const getTypeBadgeVariant = (type: string): 'founder' | 'investor' | 'vesting' => {
     switch (type) {
-      case 'Individual':
+      case 'Founder':
         return 'founder';
-      case 'Company':
+      case 'Investor':
         return 'investor';
-      case 'InvestmentFund':
+      case 'ESOP':
         return 'vesting';
       default:
         return 'investor';
@@ -231,11 +231,7 @@ export function CapTableTable({ entries = [], isLoading }: CapTableTableProps) {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <Badge variant={getTypeBadgeVariant(entry.shareholderTypeDescription)}>
-                      {entry.shareholderTypeDescription === 'Individual'
-                        ? 'PF'
-                        : entry.shareholderTypeDescription === 'Company'
-                        ? 'PJ'
-                        : 'Fundo'}
+                      {getShareholderTypeLabel(entry.shareholderTypeDescription)}
                     </Badge>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
