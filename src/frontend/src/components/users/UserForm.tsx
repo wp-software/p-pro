@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { X } from 'lucide-react';
 import { Button, Input } from '@/components/ui';
 import { useCreateUser, useUpdateUser } from '@/hooks/useUsers';
+import { useAllShareholders } from '@/hooks/useShareholders';
+import { useAuthStore } from '@/stores/authStore';
 import type { UserSummary, Role } from '@/types';
 
 const RoleLabels: Record<Role, string> = {
@@ -29,6 +31,7 @@ const createUserSchema = z.object({
     .min(1, 'Email é obrigatório'),
   phone: z.string().optional(),
   initialRole: z.enum(roleValues),
+  shareholderId: z.string().optional(),
 });
 
 const updateUserSchema = z.object({
@@ -39,6 +42,7 @@ const updateUserSchema = z.object({
     .url('URL inválida')
     .optional()
     .or(z.literal('')),
+  shareholderId: z.string().optional(),
 });
 
 type CreateUserForm = z.infer<typeof createUserSchema>;
@@ -53,6 +57,8 @@ export function UserForm({ user, onClose }: UserFormProps) {
   const isEditing = !!user;
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
+  const companyId = useAuthStore((state) => state.user?.companyId);
+  const { data: shareholders = [], isLoading: loadingShareholders } = useAllShareholders(companyId);
 
   const {
     register,
@@ -60,18 +66,22 @@ export function UserForm({ user, onClose }: UserFormProps) {
     formState: { errors, isSubmitting },
   } = useForm<CreateUserForm | UpdateUserForm>({
     resolver: zodResolver(isEditing ? updateUserSchema : createUserSchema),
-    defaultValues: isEditing ? { name: user.name } : { initialRole: 'Viewer' },
+    defaultValues: isEditing
+      ? { name: user.name, shareholderId: user.shareholderId ?? '' }
+      : { initialRole: 'Viewer', shareholderId: '' },
   });
 
   const onSubmit = async (data: CreateUserForm | UpdateUserForm) => {
     try {
       if (isEditing) {
+        const form = data as UpdateUserForm;
         await updateUser.mutateAsync({
           id: user.id,
-          data: data as UpdateUserForm,
+          data: { ...form, shareholderId: form.shareholderId || null },
         });
       } else {
-        await createUser.mutateAsync(data as CreateUserForm);
+        const form = data as CreateUserForm;
+        await createUser.mutateAsync({ ...form, shareholderId: form.shareholderId || null });
       }
       onClose();
     } catch (error) {
@@ -145,6 +155,26 @@ export function UserForm({ user, onClose }: UserFormProps) {
             error={errors.phone?.message}
             {...register('phone')}
           />
+
+          <div>
+            <label className="input-label">Sócio vinculado</label>
+            <select
+              className="input"
+              disabled={loadingShareholders}
+              {...register('shareholderId')}
+            >
+              <option value="">Nenhum</option>
+              {shareholders.map((shareholder) => (
+                <option key={shareholder.id} value={shareholder.id}>
+                  {shareholder.name}
+                  {shareholder.email ? ` (${shareholder.email})` : ''}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-primary-500 mt-1">
+              Define de quais dados de sócio (participação e vesting) este usuário pode ver.
+            </p>
+          </div>
 
           {isEditing && (
             <Input

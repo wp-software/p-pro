@@ -17,6 +17,7 @@ public class UserRepository : BaseRepository<User>, IUserRepository
         id AS Id,
         client_id AS ClientId,
         company_id AS CompanyId,
+        shareholder_id AS ShareholderId,
         email AS Email,
         name AS Name,
         password_hash AS PasswordHash,
@@ -162,11 +163,11 @@ public class UserRepository : BaseRepository<User>, IUserRepository
     public async Task AddAsync(User user)
     {
         var sql = @"INSERT INTO users 
-                    (id, client_id, company_id, email, name, password_hash, avatar_url, phone,
+                    (id, client_id, company_id, shareholder_id, email, name, password_hash, avatar_url, phone,
                      status, language, timezone, preferences, two_factor_enabled,
                      created_at, updated_at, created_by)
                     VALUES 
-                    (@Id, @ClientId, @CompanyId, @Email, @Name, @PasswordHash, @AvatarUrl, @Phone,
+                    (@Id, @ClientId, @CompanyId, @ShareholderId, @Email, @Name, @PasswordHash, @AvatarUrl, @Phone,
                      @Status, @Language, @Timezone, @Preferences, @TwoFactorEnabled,
                      @CreatedAt, @UpdatedAt, @CreatedBy)";
 
@@ -175,6 +176,7 @@ public class UserRepository : BaseRepository<User>, IUserRepository
             Id = user.Id.ToString(),
             ClientId = user.ClientId.ToString(),
             CompanyId = user.CompanyId?.ToString(),
+            ShareholderId = user.ShareholderId?.ToString(),
             user.Email,
             user.Name,
             user.PasswordHash,
@@ -195,6 +197,7 @@ public class UserRepository : BaseRepository<User>, IUserRepository
     {
         var sql = @"UPDATE users SET
                         name = @Name,
+                        shareholder_id = @ShareholderId,
                         avatar_url = @AvatarUrl,
                         phone = @Phone,
                         status = @Status,
@@ -211,6 +214,7 @@ public class UserRepository : BaseRepository<User>, IUserRepository
         await Connection.ExecuteAsync(sql, new
         {
             Id = user.Id.ToString(),
+            ShareholderId = user.ShareholderId?.ToString(),
             user.Name,
             user.AvatarUrl,
             user.Phone,
@@ -281,6 +285,22 @@ public class UserRepository : BaseRepository<User>, IUserRepository
                 UpdatedAt = DateTime.UtcNow
             }, Transaction);
         }
+    }
+
+    public async Task<User?> GetByShareholderIdAsync(Guid shareholderId)
+    {
+        var sql = $"SELECT {SelectColumns} FROM users WHERE shareholder_id = @ShareholderId AND is_deleted = 0";
+        return await Connection.QueryFirstOrDefaultAsync<User>(
+            sql, new { ShareholderId = shareholderId.ToString() }, Transaction);
+    }
+
+    // Libera o vínculo para que o sócio possa ser associado a outro usuário
+    public override async Task SoftDeleteAsync(Guid id, Guid? deletedBy = null)
+    {
+        await base.SoftDeleteAsync(id, deletedBy);
+        await Connection.ExecuteAsync(
+            "UPDATE users SET shareholder_id = NULL WHERE id = @Id",
+            new { Id = id.ToString() }, Transaction);
     }
 
     public async Task<User?> GetByRefreshTokenAsync(string refreshToken)

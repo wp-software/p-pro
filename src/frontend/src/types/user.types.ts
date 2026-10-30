@@ -3,6 +3,7 @@
 export interface User {
   id: string;
   companyId: string;
+  shareholderId?: string | null;
   email: string;
   name: string;
   avatarUrl?: string;
@@ -23,6 +24,7 @@ export interface UserSummary {
   name: string;
   avatarUrl?: string;
   status: string;
+  shareholderId?: string | null;
   roles: string[];
 }
 
@@ -31,12 +33,14 @@ export interface CreateUserRequest {
   email: string;
   phone?: string;
   initialRole: Role;
+  shareholderId?: string | null;
 }
 
 export interface UpdateUserRequest {
   name: string;
   phone?: string;
   avatarUrl?: string;
+  shareholderId?: string | null;
 }
 
 export interface ManageUserRoleRequest {

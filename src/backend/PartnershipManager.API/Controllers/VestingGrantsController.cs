@@ -5,6 +5,9 @@ using PartnershipManager.API.Middlewares;
 using PartnershipManager.Application.Common.Models;
 using PartnershipManager.Application.Features.Vesting.DTOs;
 using PartnershipManager.Domain.Constants;
+using PartnershipManager.Domain.Enums;
+using PartnershipManager.Domain.Exceptions;
+using PartnershipManager.Domain.Interfaces;
 using PartnershipManager.Infrastructure.Services;
 
 namespace PartnershipManager.API.Controllers;
@@ -18,13 +21,45 @@ namespace PartnershipManager.API.Controllers;
 [Produces("application/json")]
 public class VestingGrantsController : ControllerBase
 {
+    private static readonly string[] RestrictedRoles =
+        { nameof(Role.Employee), nameof(Role.Investor), nameof(Role.Viewer) };
+
     private readonly IVestingGrantService _vestingGrantService;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly IShareholderRepository _shareholderRepository;
+    private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<VestingGrantsController> _logger;
 
-    public VestingGrantsController(IVestingGrantService vestingGrantService, ILogger<VestingGrantsController> logger)
+    public VestingGrantsController(
+        IVestingGrantService vestingGrantService,
+        IUnitOfWork unitOfWork,
+        IShareholderRepository shareholderRepository,
+        ICurrentUserService currentUserService,
+        ILogger<VestingGrantsController> logger)
     {
         _vestingGrantService = vestingGrantService;
+        _unitOfWork = unitOfWork;
+        _shareholderRepository = shareholderRepository;
+        _currentUserService = currentUserService;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Lista os grants do sócio vinculado ao usuário logado
+    /// </summary>
+    [HttpGet("me")]
+    [ProducesResponseType(typeof(ApiResponse<IEnumerable<VestingGrantResponse>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetMine([FromQuery] Guid? companyId)
+    {
+        var clientId = HttpContext.GetRequiredClientId();
+        var shareholderId = await GetOwnShareholderIdAsync(companyId);
+        if (shareholderId == null)
+        {
+            return Ok(ApiResponse<IEnumerable<VestingGrantResponse>>.Ok(Array.Empty<VestingGrantResponse>()));
+        }
+
+        var result = await _vestingGrantService.GetByShareholderAsync(clientId, shareholderId.Value, companyId);
+        return Ok(ApiResponse<IEnumerable<VestingGrantResponse>>.Ok(result));
     }
 
     /// <summary>
@@ -42,6 +77,17 @@ public class VestingGrantsController : ControllerBase
     {
         pageSize = Math.Min(pageSize, SystemConstants.MaxPageSize);
         var clientId = HttpContext.GetRequiredClientId();
+
+        if (IsRestrictedUser())
+        {
+            shareholderId = await GetOwnShareholderIdAsync(companyId);
+            if (shareholderId == null)
+            {
+                return Ok(ApiResponse<VestingGrantListResponse>.Ok(
+                    new VestingGrantListResponse(Array.Empty<VestingGrantResponse>(), 0, page, pageSize)));
+            }
+        }
+
         var result = await _vestingGrantService.GetPagedAsync(
             clientId, companyId, page, pageSize, vestingPlanId, shareholderId, status);
         return Ok(ApiResponse<VestingGrantListResponse>.Ok(result));
@@ -55,6 +101,11 @@ public class VestingGrantsController : ControllerBase
     public async Task<IActionResult> GetByShareholder(Guid shareholderId, [FromQuery] Guid? companyId)
     {
         var clientId = HttpContext.GetRequiredClientId();
+        if (IsRestrictedUser() && await GetOwnShareholderIdAsync(companyId) != shareholderId)
+        {
+            throw new ForbiddenException();
+        }
+
         var result = await _vestingGrantService.GetByShareholderAsync(clientId, shareholderId, companyId);
         return Ok(ApiResponse<IEnumerable<VestingGrantResponse>>.Ok(result));
     }
@@ -69,6 +120,7 @@ public class VestingGrantsController : ControllerBase
     {
         var clientId = HttpContext.GetRequiredClientId();
         var result = await _vestingGrantService.GetByIdAsync(id, clientId);
+        await EnsureCanAccessGrantAsync(result);
         return Ok(ApiResponse<VestingGrantResponse>.Ok(result));
     }
 
@@ -80,6 +132,7 @@ public class VestingGrantsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreateVestingGrantRequest request)
     {
+        EnsureNotRestrictedUser();
         var clientId = HttpContext.GetRequiredClientId();
         var userId = GetUserId();
         var result = await _vestingGrantService.CreateAsync(clientId, request, userId);
@@ -96,6 +149,7 @@ public class VestingGrantsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Approve(Guid id)
     {
+        EnsureNotRestrictedUser();
         var clientId = HttpContext.GetRequiredClientId();
         var userId = GetUserId() ?? Guid.Empty;
         var result = await _vestingGrantService.ApproveAsync(id, clientId, userId);
@@ -110,6 +164,7 @@ public class VestingGrantsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<VestingGrantResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Activate(Guid id)
     {
+        EnsureNotRestrictedUser();
         var clientId = HttpContext.GetRequiredClientId();
         var userId = GetUserId() ?? Guid.Empty;
         var result = await _vestingGrantService.ActivateAsync(id, clientId, userId);
@@ -123,6 +178,7 @@ public class VestingGrantsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<VestingGrantResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Cancel(Guid id)
     {
+        EnsureNotRestrictedUser();
         var clientId = HttpContext.GetRequiredClientId();
         var userId = GetUserId() ?? Guid.Empty;
         var result = await _vestingGrantService.CancelAsync(id, clientId, userId);
@@ -136,6 +192,7 @@ public class VestingGrantsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<VestingGrantResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Recalculate(Guid id)
     {
+        EnsureNotRestrictedUser();
         var clientId = HttpContext.GetRequiredClientId();
         var userId = GetUserId() ?? Guid.Empty;
         var result = await _vestingGrantService.RecalculateVestingAsync(id, clientId, userId);
@@ -151,6 +208,7 @@ public class VestingGrantsController : ControllerBase
     public async Task<IActionResult> Exercise(Guid id, [FromBody] ExerciseSharesRequest request)
     {
         var clientId = HttpContext.GetRequiredClientId();
+        await EnsureCanAccessGrantAsync(await _vestingGrantService.GetByIdAsync(id, clientId));
         var userId = GetUserId() ?? Guid.Empty;
         var result = await _vestingGrantService.ExerciseSharesAsync(id, clientId, request, userId);
         _logger.LogInformation("Ações exercitadas — Grant: {VestingGrantId}, Quantidade: {Shares}",
@@ -166,6 +224,7 @@ public class VestingGrantsController : ControllerBase
     public async Task<IActionResult> Calculate(Guid id, [FromQuery] DateTime? asOfDate)
     {
         var clientId = HttpContext.GetRequiredClientId();
+        await EnsureCanAccessGrantAsync(await _vestingGrantService.GetByIdAsync(id, clientId));
         var result = await _vestingGrantService.CalculateAsOfAsync(id, clientId, asOfDate);
         return Ok(ApiResponse<VestingCalculationResult>.Ok(result));
     }
@@ -178,6 +237,7 @@ public class VestingGrantsController : ControllerBase
     public async Task<IActionResult> Projection(Guid id, [FromQuery] int monthsAhead = 24)
     {
         var clientId = HttpContext.GetRequiredClientId();
+        await EnsureCanAccessGrantAsync(await _vestingGrantService.GetByIdAsync(id, clientId));
         var result = await _vestingGrantService.GetProjectionAsync(id, clientId, monthsAhead);
         return Ok(ApiResponse<VestingProjectionResponse>.Ok(result));
     }
@@ -190,6 +250,7 @@ public class VestingGrantsController : ControllerBase
     public async Task<IActionResult> GetTransactions(Guid id)
     {
         var clientId = HttpContext.GetRequiredClientId();
+        await EnsureCanAccessGrantAsync(await _vestingGrantService.GetByIdAsync(id, clientId));
         var result = await _vestingGrantService.GetTransactionsAsync(id, clientId);
         return Ok(ApiResponse<IEnumerable<VestingTransactionResponse>>.Ok(result));
     }
@@ -202,11 +263,62 @@ public class VestingGrantsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id)
     {
+        EnsureNotRestrictedUser();
         var clientId = HttpContext.GetRequiredClientId();
         var userId = GetUserId();
         await _vestingGrantService.DeleteAsync(id, clientId, userId);
         _logger.LogInformation("Grant de vesting removido: {VestingGrantId}", id);
         return Ok(ApiResponse.Ok("Grant removido com sucesso"));
+    }
+
+    // Usuários sem nenhum papel de gestão só enxergam os dados do próprio sócio
+    private bool IsRestrictedUser()
+        => !_currentUserService.Roles.Any(r => !RestrictedRoles.Contains(r, StringComparer.OrdinalIgnoreCase));
+
+    private void EnsureNotRestrictedUser()
+    {
+        if (IsRestrictedUser())
+        {
+            throw new ForbiddenException();
+        }
+    }
+
+    private async Task EnsureCanAccessGrantAsync(VestingGrantResponse grant)
+    {
+        if (!IsRestrictedUser())
+        {
+            return;
+        }
+
+        var own = await GetOwnShareholderIdAsync(grant.CompanyId);
+        if (own == null || own != grant.ShareholderId)
+        {
+            throw new ForbiddenException();
+        }
+    }
+
+    // Sócio vinculado ao usuário logado; null se não houver vínculo ou se ele não pertencer à empresa
+    private async Task<Guid?> GetOwnShareholderIdAsync(Guid? companyId)
+    {
+        var userId = GetUserId();
+        if (userId == null)
+        {
+            return null;
+        }
+
+        var user = await _unitOfWork.Users.GetByIdAsync(userId.Value);
+        if (user?.ShareholderId == null)
+        {
+            return null;
+        }
+
+        if (companyId.HasValue &&
+            !await _shareholderRepository.IsLinkedToCompanyAsync(user.ShareholderId.Value, companyId.Value))
+        {
+            return null;
+        }
+
+        return user.ShareholderId;
     }
 
     private Guid? GetUserId()

@@ -532,6 +532,18 @@ public class ShareholderRepository : IShareholderRepository
         return count > 0;
     }
 
+    public async Task<bool> IsLinkedToCompanyAsync(Guid shareholderId, Guid companyId)
+    {
+        var count = await Connection.ExecuteScalarAsync<int>(
+            @"SELECT COUNT(1) FROM shareholders sh
+              WHERE sh.id = @ShareholderId AND sh.is_deleted = 0
+                AND (sh.company_id = @CompanyId
+                     OR EXISTS (SELECT 1 FROM shareholder_companies sc
+                                WHERE sc.shareholder_id = sh.id AND sc.company_id = @CompanyId))",
+            new { ShareholderId = shareholderId.ToString(), CompanyId = companyId.ToString() }, Transaction);
+        return count > 0;
+    }
+
     public async Task RemoveCompanyLinkAsync(Guid shareholderId, Guid companyId)
     {
         await Connection.ExecuteAsync(

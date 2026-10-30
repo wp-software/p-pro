@@ -113,6 +113,7 @@ public class AuthController : ControllerBase
                 AvatarUrl = user.AvatarUrl,
                 CompanyId = companyId ?? Guid.Empty,
                 CompanyName = company?.Name ?? string.Empty,
+                ShareholderId = user.ShareholderId,
                 Roles = roles.ToList(),
                 Language = user.Language.ToString().ToLower()
             }
@@ -192,6 +193,7 @@ public class AuthController : ControllerBase
                 AvatarUrl = user.AvatarUrl,
                 CompanyId = companyId ?? Guid.Empty,
                 CompanyName = company?.Name ?? string.Empty,
+                ShareholderId = user.ShareholderId,
                 Roles = roles.ToList(),
                 Language = user.Language.ToString().ToLower()
             }
@@ -238,6 +240,7 @@ public class AuthController : ControllerBase
             AvatarUrl = user.AvatarUrl,
             CompanyId = companyId ?? Guid.Empty,
             CompanyName = company?.Name ?? string.Empty,
+            ShareholderId = user.ShareholderId,
             Roles = roles.ToList(),
             Language = user.Language.ToString().ToLower()
         };

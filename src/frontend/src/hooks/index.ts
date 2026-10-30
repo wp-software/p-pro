@@ -19,4 +19,5 @@ export * from './useNotifications';
 export * from './useWorkflows';
 export * from './useDataRoom';
 export * from './useInvestorPortal';
+export * from './useShareholderLink';
 export * from './useSessionTimeout';

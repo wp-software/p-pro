@@ -118,6 +118,13 @@ export const vestingGrantService = {
     return response.data.data;
   },
 
+  async getMyGrants(companyId?: string): Promise<VestingGrant[]> {
+    const params: Record<string, string | undefined> = {};
+    if (companyId) params.companyId = companyId;
+    const response = await api.get<ApiResponse<VestingGrant[]>>('/vesting-grants/me', { params });
+    return response.data.data;
+  },
+
   async getGrantsByShareholder(
     shareholderId: string,
     companyId?: string

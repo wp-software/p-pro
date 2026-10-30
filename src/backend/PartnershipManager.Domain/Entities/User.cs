@@ -9,6 +9,7 @@ public partial class User : BaseEntity
 {
     public Guid ClientId { get; private set; }
     public Guid? CompanyId { get; private set; }
+    public Guid? ShareholderId { get; private set; }
     public string Email { get; private set; } = string.Empty;
     public string Name { get; private set; } = string.Empty;
     public string PasswordHash { get; private set; } = string.Empty;
@@ -96,6 +97,12 @@ public partial class User : BaseEntity
         Name = name.Trim();
         Phone = phone?.Trim();
         AvatarUrl = avatarUrl;
+        UpdatedAt = DateTime.UtcNow;
+    }
+    
+    public void LinkShareholder(Guid? shareholderId)
+    {
+        ShareholderId = shareholderId == Guid.Empty ? null : shareholderId;
         UpdatedAt = DateTime.UtcNow;
     }
     

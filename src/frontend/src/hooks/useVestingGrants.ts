@@ -13,6 +13,14 @@ export function useVestingGrants(filters?: VestingGrantFilters) {
   });
 }
 
+export function useMyVestingGrants(companyId?: string) {
+  return useQuery({
+    queryKey: [...QUERY_KEY, 'me', companyId],
+    queryFn: () => vestingGrantService.getMyGrants(companyId),
+    staleTime: 30000,
+  });
+}
+
 export function useVestingGrantsByShareholder(shareholderId: string, companyId?: string) {
   return useQuery({
     queryKey: [...QUERY_KEY, 'by-shareholder', shareholderId, companyId],

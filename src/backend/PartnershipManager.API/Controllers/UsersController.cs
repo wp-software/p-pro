@@ -24,6 +24,7 @@ namespace PartnershipManager.API.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IShareholderRepository _shareholderRepository;
     private readonly IAuthService _authService;
     private readonly ICacheService _cacheService;
     private readonly ICurrentUserService _currentUserService;
@@ -33,6 +34,7 @@ public class UsersController : ControllerBase
     
     public UsersController(
         IUnitOfWork unitOfWork,
+        IShareholderRepository shareholderRepository,
         IAuthService authService,
         ICacheService cacheService,
         ICurrentUserService currentUserService,
@@ -41,6 +43,7 @@ public class UsersController : ControllerBase
         ILogger<UsersController> logger)
     {
         _unitOfWork = unitOfWork;
+        _shareholderRepository = shareholderRepository;
         _authService = authService;
         _cacheService = cacheService;
         _currentUserService = currentUserService;
@@ -125,6 +128,12 @@ public class UsersController : ControllerBase
             request.Name,
             passwordHash: string.Empty,
             companyId);
+
+        if (request.ShareholderId.HasValue)
+        {
+            await EnsureShareholderLinkableAsync(user, request.ShareholderId.Value);
+            user.LinkShareholder(request.ShareholderId);
+        }
         
         await _unitOfWork.BeginTransactionAsync();
         
@@ -196,6 +205,17 @@ public class UsersController : ControllerBase
         }
         
         user.UpdateProfile(request.Name, request.Phone, request.AvatarUrl);
+
+        if (CanManageShareholderLink())
+        {
+            if (request.ShareholderId.HasValue)
+            {
+                await EnsureShareholderLinkableAsync(user, request.ShareholderId.Value);
+            }
+
+            user.LinkShareholder(request.ShareholderId);
+        }
+
         await _unitOfWork.Users.UpdateAsync(user);
         
         await _cacheService.RemoveAsync(CacheKeys.User(id));
@@ -454,6 +474,30 @@ public class UsersController : ControllerBase
         return user;
     }
 
+    private bool CanManageShareholderLink()
+        => _currentUserService.Roles.Any(r =>
+            r.Equals(Role.SuperAdmin.ToString(), StringComparison.OrdinalIgnoreCase) ||
+            r.Equals(Role.Admin.ToString(), StringComparison.OrdinalIgnoreCase) ||
+            r.Equals(Role.HR.ToString(), StringComparison.OrdinalIgnoreCase));
+
+    private async Task EnsureShareholderLinkableAsync(User user, Guid shareholderId)
+    {
+        var shareholder = await _shareholderRepository.GetByIdAsync(shareholderId, user.ClientId)
+            ?? throw new NotFoundException("Sócio", shareholderId);
+
+        if (user.CompanyId.HasValue &&
+            !await _shareholderRepository.IsLinkedToCompanyAsync(shareholder.Id, user.CompanyId.Value))
+        {
+            throw new ValidationException("ShareholderId", "O sócio não está vinculado à empresa do usuário.");
+        }
+
+        var linkedUser = await _unitOfWork.Users.GetByShareholderIdAsync(shareholder.Id);
+        if (linkedUser != null && linkedUser.Id != user.Id)
+        {
+            throw new ConflictException("Este sócio já está vinculado a outro usuário.");
+        }
+    }
+
     private void EnsureCanAssignRole(Role role)
     {
         if (!Enum.IsDefined(role))
@@ -495,6 +539,7 @@ public class UsersController : ControllerBase
         {
             Id = user.Id,
             CompanyId = user.CompanyId ?? Guid.Empty,
+            ShareholderId = user.ShareholderId,
             Email = user.Email,
             Name = user.Name,
             AvatarUrl = user.AvatarUrl,
@@ -519,6 +564,7 @@ public class UsersController : ControllerBase
             Name = user.Name,
             AvatarUrl = user.AvatarUrl,
             Status = user.Status.ToString(),
+            ShareholderId = user.ShareholderId,
             Roles = roles.ToList()
         };
     }

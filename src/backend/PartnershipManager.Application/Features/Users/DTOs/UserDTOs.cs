@@ -9,6 +9,7 @@ public record UserResponse
 {
     public Guid Id { get; init; }
     public Guid CompanyId { get; init; }
+    public Guid? ShareholderId { get; init; }
     public string Email { get; init; } = string.Empty;
     public string Name { get; init; } = string.Empty;
     public string? AvatarUrl { get; init; }
@@ -32,6 +33,7 @@ public record CreateUserRequest
     public string Email { get; init; } = string.Empty;
     public string? Phone { get; init; }
     public Role InitialRole { get; init; } = Role.Viewer;
+    public Guid? ShareholderId { get; init; }
 }
 
 /// <summary>
@@ -42,6 +44,12 @@ public record UpdateUserRequest
     public string Name { get; init; } = string.Empty;
     public string? Phone { get; init; }
     public string? AvatarUrl { get; init; }
+
+    /// <summary>
+    /// Vínculo com o sócio. Só é aplicado quando o chamador é Admin/SuperAdmin/HR;
+    /// nesse caso, null remove o vínculo.
+    /// </summary>
+    public Guid? ShareholderId { get; init; }
 }
 
 /// <summary>
@@ -72,5 +80,6 @@ public record UserSummaryResponse
     public string Name { get; init; } = string.Empty;
     public string? AvatarUrl { get; init; }
     public string Status { get; init; } = string.Empty;
+    public Guid? ShareholderId { get; init; }
     public IReadOnlyList<string> Roles { get; init; } = Array.Empty<string>();
 }

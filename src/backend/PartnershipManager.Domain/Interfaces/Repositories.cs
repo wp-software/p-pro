@@ -88,6 +88,7 @@ public interface IShareholderRepository
     Task UpsertCompanyLinkAsync(Guid shareholderId, Guid clientId, ShareholderCompanyConfig config);
     Task RemoveCompanyLinkAsync(Guid shareholderId, Guid companyId);
     Task<bool> HasPositionInCompanyAsync(Guid shareholderId, Guid companyId);
+    Task<bool> IsLinkedToCompanyAsync(Guid shareholderId, Guid companyId);
 }
 
 public record ShareholderCompanyConfig(
@@ -279,6 +280,7 @@ public interface IUserRepository
 {
     Task<User?> GetByIdAsync(Guid id);
     Task<User?> GetByEmailAsync(string email, Guid? companyId = null);
+    Task<User?> GetByShareholderIdAsync(Guid shareholderId);
     Task<User?> GetByRefreshTokenAsync(string refreshToken);
     Task<bool> EmailExistsAsync(string email, Guid companyId, Guid? excludeId = null);
     Task<IEnumerable<User>> GetByCompanyAsync(Guid companyId);

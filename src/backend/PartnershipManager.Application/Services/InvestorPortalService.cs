@@ -61,10 +61,13 @@ public class InvestorPortalService : IInvestorPortalService
             DocumentsCount = docsTotal
         };
 
-        if (user == null || string.IsNullOrWhiteSpace(user.Email) || clientId == Guid.Empty)
+        if (user?.ShareholderId == null || clientId == Guid.Empty)
             return response;
 
-        var shareholder = await _shareholderRepo.GetByEmailAsync(clientId, companyId, user.Email);
+        if (!await _shareholderRepo.IsLinkedToCompanyAsync(user.ShareholderId.Value, companyId))
+            return response;
+
+        var shareholder = await _shareholderRepo.GetByIdAsync(user.ShareholderId.Value, clientId);
         if (shareholder == null)
             return response;
 

@@ -3,7 +3,8 @@ import { TrendingUp, Clock, CheckCircle, Target } from 'lucide-react';
 import { Card, Spinner } from '@/components/ui';
 import { useClientStore } from '@/stores/clientStore';
 import { VestingProgressBar } from '@/components/vesting';
-import { useVestingGrants } from '@/hooks';
+import { useMyVestingGrants, useShareholderLink } from '@/hooks';
+import { ShareholderNotLinkedNotice } from '@/components/ui/ShareholderNotLinkedNotice';
 import {
   VestingGrantDetailStatus,
   vestingGrantStatusLabels,
@@ -22,23 +23,26 @@ export default function MyVestingPage() {
   const navigate = useNavigate();
   const { selectedCompanyId } = useClientStore();
 
-  const { data, isLoading, isError } = useVestingGrants({
-    companyId: selectedCompanyId ?? undefined,
-  });
+  const link = useShareholderLink();
+  const { data, isLoading, isError } = useMyVestingGrants(selectedCompanyId ?? undefined);
 
-  const grants = data?.items ?? [];
+  const grants = data ?? [];
 
   const totalVested = grants.reduce((acc, g) => acc + g.vestedShares, 0);
   const totalShares = grants.reduce((acc, g) => acc + g.totalShares, 0);
   const totalAvailable = grants.reduce((acc, g) => acc + g.availableToExercise, 0);
   const totalExercised = grants.reduce((acc, g) => acc + g.exercisedShares, 0);
 
-  if (isLoading) {
+  if (link.isLoading || isLoading) {
     return (
       <div className="flex justify-center py-20">
         <Spinner className="w-8 h-8 text-indigo-600" />
       </div>
     );
+  }
+
+  if (!link.isLinked) {
+    return <ShareholderNotLinkedNotice />;
   }
 
   if (isError) {
@@ -96,7 +100,8 @@ export default function MyVestingPage() {
           <Target className="w-12 h-12 text-gray-300 mx-auto mb-3" />
           <h3 className="font-semibold text-gray-700 mb-1">Nenhum grant encontrado</h3>
           <p className="text-gray-400 text-sm">
-            Você ainda não possui grants de vesting associados à sua conta.
+            Você ainda não possui grants de vesting associados à sua conta. Se acredita que deveria,
+            peça a um administrador para vincular seu usuário ao seu cadastro de sócio.
           </p>
         </Card>
       ) : (

@@ -20,6 +20,7 @@ export interface UserInfo {
   avatarUrl?: string;
   companyId: string;
   companyName: string;
+  shareholderId?: string | null;
   roles: string[];
   language: string;
 }

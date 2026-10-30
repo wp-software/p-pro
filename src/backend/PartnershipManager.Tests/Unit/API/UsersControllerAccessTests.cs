@@ -104,6 +104,7 @@ public class UsersControllerAccessTests
 
         var controller = new UsersController(
             unitOfWork.Object,
+            Mock.Of<IShareholderRepository>(),
             Mock.Of<IAuthService>(),
             Mock.Of<ICacheService>(),
             currentUser.Object,

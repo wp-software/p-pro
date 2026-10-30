@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { Card, StatCard, Spinner } from '@/components/ui';
 import { useInvestorSummary, usePortalCommunications } from '@/hooks/useInvestorPortal';
+import { useShareholderLink } from '@/hooks/useShareholderLink';
+import { ShareholderNotLinkedNotice } from '@/components/ui/ShareholderNotLinkedNotice';
 import { formatCurrency, formatDate } from '@/utils/format';
 import { cn } from '@/utils/cn';
 
@@ -29,17 +31,22 @@ const TYPE_COLORS: Record<string, string> = {
 
 export default function InvestorPortalPage() {
   const navigate = useNavigate();
+  const link = useShareholderLink();
   const { data: summary, isLoading: summaryLoading } = useInvestorSummary();
   const { data: commData, isLoading: commLoading } = usePortalCommunications({ pageSize: 3 });
 
   const communications = commData?.items ?? [];
 
-  if (summaryLoading) {
+  if (link.isLoading || summaryLoading) {
     return (
       <div className="flex justify-center py-20">
         <Spinner />
       </div>
     );
+  }
+
+  if (!link.isLinked) {
+    return <ShareholderNotLinkedNotice />;
   }
 
   return (

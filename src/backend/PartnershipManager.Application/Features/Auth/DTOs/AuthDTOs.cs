@@ -33,6 +33,7 @@ public record UserInfo
     public string? AvatarUrl { get; init; }
     public Guid CompanyId { get; init; }
     public string CompanyName { get; init; } = string.Empty;
+    public Guid? ShareholderId { get; init; }
     public IReadOnlyList<string> Roles { get; init; } = Array.Empty<string>();
     public string Language { get; init; } = "pt";
 }
